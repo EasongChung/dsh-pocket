@@ -249,3 +249,17 @@ test('临时 PIN（issue #69）：生成、列出去过期、撤销、host 分�
   const after = JSON.parse(readFileSync(sp, 'utf8'));
   assert.equal(after.tempPins.find((p) => p.value === 'expired1'), undefined, '过期项在写盘时已清掉');
 }));
+
+test('cloudflared 路径（issue #45）：默认空、可设可清', async () => withHome(async () => {
+  const { cloudflaredPath, setCloudflaredPath, settingsPath } = await import('../lib/settings.mjs');
+  assert.equal(cloudflaredPath(), '', '默认空');
+  assert.equal(setCloudflaredPath('/usr/local/bin/cloudflared'), '/usr/local/bin/cloudflared', '设置后立即返回');
+  assert.equal(cloudflaredPath(), '/usr/local/bin/cloudflared', '重新读取生效');
+  const raw = JSON.parse(readFileSync(settingsPath(), 'utf8'));
+  assert.equal(raw.cloudflaredPath, '/usr/local/bin/cloudflared', 'settings.json 字段正确');
+  // 清除
+  assert.equal(setCloudflaredPath(''), '', '空字符串清除');
+  assert.equal(cloudflaredPath(), '', '清除后回到默认');
+  // 空格 trim
+  assert.equal(setCloudflaredPath('  /opt/cf/cloudflared  '), '/opt/cf/cloudflared', '自动 trim');
+}));
