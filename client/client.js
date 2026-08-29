@@ -2122,9 +2122,9 @@ function PocketSettingsTab({ rpcCall, t }) {
         )
       )
     ) : null,
-    // Toast：重置等操作的即时反馈（固定底部居中，2.6s 自动消失）
+    // Toast：重置等操作的即时反馈（固定屏幕正中央，2.6s 自动消失）
     toast ? (0, import_react2.createElement)("div", {
-      style: { position: "fixed", left: "50%", bottom: 32, transform: "translateX(-50%)", zIndex: 10001, maxWidth: "86vw", background: "var(--dsw-alias-bg-layer-1,#fff)", color: "var(--dsw-alias-label-primary,inherit)", border: "1px solid var(--dsw-alias-border-l2,#e5e7eb)", borderRadius: 999, padding: "9px 18px", fontSize: 13, lineHeight: 1.5, boxShadow: "0 6px 20px rgba(0,0,0,.14)" }
+      style: { position: "fixed", left: "50%", top: "50%", transform: "translate(-50%, -50%)", zIndex: 10001, width: "auto", maxWidth: 280, background: "rgba(17,24,39,.92)", color: "#fff", border: "none", borderRadius: 10, padding: "10px 16px", fontSize: 13, lineHeight: 1.5, textAlign: "center", boxShadow: "0 8px 24px rgba(0,0,0,.22)" }
     }, toast) : null,
     // 局域网访问开关确认弹框（关闭/打开时弹窗提醒）
     lanToggleOpen !== null ? (0, import_react2.createElement)(
