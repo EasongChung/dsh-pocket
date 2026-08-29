@@ -156,12 +156,12 @@ test('打包产物：mobile-apply 引用的组件都有 import 且有定义', ()
     // 排除纯类型；再排除光秃秃的 "Mobile"（注释里的 Mobile-adaptive 之类）
     (n) => !typeOnly.has(n) && /^Mobile[A-Z]/.test(n),
   );
-  assert.ok(used.length >= 4, `预期至少 4 个 Mobile* 组件，实际 ${used.length}`);
+  assert.ok(used.length >= 3, `预期至少 3 个 Mobile* 组件，实际 ${used.length}`);
 
   for (const name of used) {
     // ① 必须在源码里 import —— esbuild 不检查未定义标识符，漏了能照常打包，
     //    到浏览器里才炸：apply 时 "<name> is not defined" → 整个插件
-    //    Failed to load plugins（2.6.0 / 2.6.1 就漏了 MobileComposerFullscreen）。
+    //    Failed to load plugins（2.6.0 / 2.6.1 就漏了某个 Mobile* 组件 import）。
     assert.match(
       src,
       new RegExp(`import\\s+(?:type\\s+)?(?:\\{[^}]*\\b${name}\\b[^}]*\\}|${name})\\s+from`),

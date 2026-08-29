@@ -3,7 +3,7 @@ import type { ClientContext } from '@deepseek-ai/dsh-client-runtime/client'
 import { MobileNavToggle } from './MobileNavToggle.tsx'
 import { MobileNavOverlay } from './MobileNavOverlay.tsx'
 import { MobileDrawerFooter } from './MobileDrawerFooter.tsx'
-import { MobileComposerFullscreen } from './MobileComposerFullscreen.tsx'
+import { startFileCopyInjection } from './fileCopy.ts'
 import { MOBILE_CSS } from './mobile.css.ts'
 import { NS, en, zh } from './locales.ts'
 import type { MobileNavKey } from './locales.ts'
@@ -263,6 +263,14 @@ export function mobileApply(ctx): void {
     }
   }, 'dsh-mobile-nav: sheet rise animation replay')
 
+  // 复制文件内容按钮（issue #17）：dsh-web 在手机上没有可用的下载入口，于是在
+  // 会话里的代码/文件块右上角注入一个「复制」按钮，把块内文本（文件内容）写
+  // 入剪贴板。只挂窄屏——桌面端 DSH 自带复制，不需要。
+  ctx.effect(() => {
+    if (!narrow.matches) return () => {}
+    return startFileCopyInjection()
+  }, 'dsh-mobile-nav: file copy button (issue #17)')
+
   ctx.slots.inject('conversation.session.header.actions', () => ctx.slots.register({
     name: 'conversation.session.header.actions',
     id: 'mobile-nav-toggle',
@@ -272,16 +280,6 @@ export function mobileApply(ctx): void {
       toggleSidebar: () => ctx.layout.toggleSidebar(),
     }),
   }, MobileNavToggle))
-
-  // 「⛶ 放大输入」按钮（issue #23）：注册到 conversation.input.right（发送键旁）
-  // ——桌面端由 mobile.css.ts 隐藏（min-width:1024px）。点按切换 body 上的
-  // data-dsh-pocket-composer-fullscreen 标记，由 CSS 把 composer 卡片全屏化。
-  ctx.slots.inject('conversation.input.right', () => ctx.slots.register({
-    name: 'conversation.input.right',
-    id: 'mobile-composer-fullscreen',
-    order: 100,
-    locale: NS,
-  }, MobileComposerFullscreen))
 
   ctx.slots.inject('shell.overlay', () => ctx.slots.register({
     name: 'shell.overlay',
