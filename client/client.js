@@ -1377,6 +1377,8 @@ var zh2 = {
   "resetTitle": "\u26A0\uFE0F \u786E\u8BA4\u6062\u590D\u51FA\u5382\u8BBE\u7F6E\uFF1F",
   "resetBody": "\u5C06\u6E05\u7A7A\u5E76\u6062\u590D\u9ED8\u8BA4\uFF1A\n\u2460 \u5F00\u5173\uFF1A\u5C40\u57DF\u7F51\u8BBF\u95EE=\u5F00\u3001\u8BBF\u95EE\u5BC6\u7801=\u5F00\u3001\u5C40\u57DF\u7F51\u5730\u5740=\u81EA\u52A8\n\u2461 \u516C\u7F51\uFF1A\u6A21\u5F0F\u56DE\u5230\u968F\u673A\u57DF\u540D\uFF0C\u6E05\u7A7A Tunnel Token \u4E0E\u56FA\u5B9A\u57DF\u540D\uFF0C\u5E76\u5173\u95ED\u6B63\u5728\u8FD0\u884C\u7684\u516C\u7F51\n\u2462 \u5BC6\u7801\uFF1A\u516C\u7F51\u548C\u5C40\u57DF\u7F51\u90FD\u6362\u6210\u65B0\u7684\u968F\u673A 8 \u4F4D\u5BC6\u7801\uFF08\u65E7\u5BC6\u7801\u7ACB\u5373\u4F5C\u5E9F\uFF0C\u624B\u673A\u9700\u91CD\u65B0\u8F93\u5165\uFF09\n\nDSH \u81EA\u8EAB\u7684\u4F1A\u8BDD\u3001\u6A21\u578B\u3001\u63D2\u4EF6\u914D\u7F6E\u4E0D\u53D7\u5F71\u54CD\uFF1B\u6B64\u64CD\u4F5C\u4E0D\u53EF\u64A4\u9500\u3002",
   "resetConfirm": "\u786E\u8BA4\u6062\u590D",
+  "resetDone": "\u2705 \u5DF2\u6062\u590D\u51FA\u5382\u8BBE\u7F6E\uFF1A\u8BBE\u7F6E\u5DF2\u6E05\u7A7A\uFF0C\u5BC6\u7801\u5DF2\u6362\u65B0\uFF08\u624B\u673A\u9700\u91CD\u65B0\u8F93\u5165\uFF09",
+  "resetFailed": "\u274C \u6062\u590D\u5931\u8D25\uFF0C\u8BF7\u91CD\u8BD5",
   "lanTitle": "\u{1F4F6} \u5C40\u57DF\u7F51\uFF08\u540C\u4E00 WiFi\uFF09",
   "lanHint": "\u624B\u673A\u8FDE\u63A5\u540C\u4E00 WiFi \u540E\u626B\u7801\u5373\u53EF\u6253\u5F00",
   "lanAccess": "\u5C40\u57DF\u7F51\u8BBF\u95EE",
@@ -1470,6 +1472,8 @@ var en2 = {
   "resetTitle": "\u26A0\uFE0F Confirm factory reset?",
   "resetBody": "This clears and restores defaults:\n\u2460 Switches: LAN access on, access PIN on, LAN address auto\n\u2461 Public: mode back to random URL, Tunnel Token and fixed domain cleared, and any running tunnel is stopped\n\u2462 PINs: both public and LAN become new random 8-character PINs (old ones stop working; the phone must re-enter)\n\nYour DSH sessions, models and plugin config are untouched. This cannot be undone.",
   "resetConfirm": "Reset",
+  "resetDone": "\u2705 Factory reset done: settings cleared and PINs re-rolled (re-enter the PIN on your phone)",
+  "resetFailed": "\u274C Reset failed \u2014 please retry",
   "lanTitle": "\u{1F4F6} LAN (same Wi-Fi)",
   "lanHint": "Scan to open once your phone is on the same Wi-Fi",
   "lanAccess": "LAN access",
@@ -1725,8 +1729,10 @@ function PocketSettingsTab({ rpcCall, t }) {
       setTunnelCfg(null);
       setCustomPin(null);
       setAdvOpen(false);
+      showToast(t("resetDone"));
     } catch (err) {
       setError(err.message);
+      showToast(t("resetFailed"));
     } finally {
       setBusy(false);
     }
@@ -1817,6 +1823,14 @@ function PocketSettingsTab({ rpcCall, t }) {
     if (i < 0) return s;
     return (t("ok") === zh2.ok ? s.slice(0, i) : s.slice(i + 3)).trim();
   };
+  const [toast, setToast] = (0, import_react2.useState)(null);
+  const toastTimer = (0, import_react2.useRef)(null);
+  const showToast = (text) => {
+    setToast(text);
+    clearTimeout(toastTimer.current);
+    toastTimer.current = setTimeout(() => setToast(null), 2600);
+  };
+  (0, import_react2.useEffect)(() => () => clearTimeout(toastTimer.current), []);
   const modeBtnStyle = (active) => ({
     ...styles.btn,
     height: 28,
@@ -2108,6 +2122,10 @@ function PocketSettingsTab({ rpcCall, t }) {
         )
       )
     ) : null,
+    // Toast：重置等操作的即时反馈（固定底部居中，2.6s 自动消失）
+    toast ? (0, import_react2.createElement)("div", {
+      style: { position: "fixed", left: "50%", bottom: 32, transform: "translateX(-50%)", zIndex: 10001, maxWidth: "86vw", background: "var(--dsw-alias-bg-layer-1,#fff)", color: "var(--dsw-alias-label-primary,inherit)", border: "1px solid var(--dsw-alias-border-l2,#e5e7eb)", borderRadius: 999, padding: "9px 18px", fontSize: 13, lineHeight: 1.5, boxShadow: "0 6px 20px rgba(0,0,0,.14)" }
+    }, toast) : null,
     // 局域网访问开关确认弹框（关闭/打开时弹窗提醒）
     lanToggleOpen !== null ? (0, import_react2.createElement)(
       "div",

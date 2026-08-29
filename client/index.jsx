@@ -7,7 +7,7 @@
 // 注：Web Push 已移除——浏览器推送依赖 Google FCM（Chrome）等境外服务，
 // 国内直连被墙，普通用户用不了。专注扫码同屏这一件事。
 
-import { createElement as h, useEffect, useState } from 'react';
+import { createElement as h, useEffect, useRef, useState } from 'react';
 
 import { POCKET_RPC_CHANNEL, POCKET_ENDPOINTS, redactStatus, compareVersions } from './api.js';
 import { mobileApply } from './mobile/mobile-apply.tsx';
@@ -231,8 +231,10 @@ function PocketSettingsTab({ rpcCall, t }) {
       setTunnelCfg(null);
       setCustomPin(null);
       setAdvOpen(false);
+      showToast(t('resetDone'));
     } catch (err) {
       setError(err.message);
+      showToast(t('resetFailed'));
     } finally {
       setBusy(false);
     }
@@ -334,6 +336,15 @@ function PocketSettingsTab({ rpcCall, t }) {
     if (i < 0) return s;
     return (t('ok') === POCKET_ZH.ok ? s.slice(0, i) : s.slice(i + 3)).trim();
   };
+  // 轻量 Toast：操作成功/失败后短暂提示（自动消失，不打断操作）
+  const [toast, setToast] = useState(null);
+  const toastTimer = useRef(null);
+  const showToast = (text) => {
+    setToast(text);
+    clearTimeout(toastTimer.current);
+    toastTimer.current = setTimeout(() => setToast(null), 2600);
+  };
+  useEffect(() => () => clearTimeout(toastTimer.current), []);
   const modeBtnStyle = (active) => ({
     ...styles.btn, height: 28, padding: '0 12px', fontSize: 12,
     fontWeight: active ? 600 : 400,
@@ -563,6 +574,11 @@ function PocketSettingsTab({ rpcCall, t }) {
         ),
       ),
     ) : null,
+
+    // Toast：重置等操作的即时反馈（固定底部居中，2.6s 自动消失）
+    toast ? h('div', {
+      style: { position: 'fixed', left: '50%', bottom: 32, transform: 'translateX(-50%)', zIndex: 10001, maxWidth: '86vw', background: 'var(--dsw-alias-bg-layer-1,#fff)', color: 'var(--dsw-alias-label-primary,inherit)', border: '1px solid var(--dsw-alias-border-l2,#e5e7eb)', borderRadius: 999, padding: '9px 18px', fontSize: 13, lineHeight: 1.5, boxShadow: '0 6px 20px rgba(0,0,0,.14)' },
+    }, toast) : null,
 
     // 局域网访问开关确认弹框（关闭/打开时弹窗提醒）
     lanToggleOpen !== null ? h('div', { style: { position: 'fixed', inset: 0, zIndex: 10000, background: 'rgba(0,0,0,.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 } },
