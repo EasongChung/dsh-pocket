@@ -104,3 +104,43 @@ test('setCustomPin / rotateAccessToken（issue #33）：8 位字母数字自定�
   assert.equal(setCustomPin('lan', '77775555'), '77775555', '局域网自定义成功');
   assert.equal(pinCustom('lan'), true, '局域网标记自定义');
 }));
+
+// ---------- 命名隧道配置（issue #66：固定公网域名） ----------
+
+test('隧道模式（issue #66）：默认 quick，可切 named/quick，非法值拒绝', () => withHome(async () => {
+  const { tunnelMode, setTunnelMode } = await import('../lib/settings.mjs');
+  assert.equal(tunnelMode(), 'quick', '默认快速隧道');
+  assert.equal(setTunnelMode('named'), 'named', '切换命名隧道');
+  assert.equal(tunnelMode(), 'named', '命名模式持久化');
+  assert.equal(setTunnelMode('quick'), 'quick', '切回快速隧道');
+  assert.equal(tunnelMode(), 'quick', '快速模式持久化');
+  assert.throws(() => setTunnelMode('other'), /quick 或 named/, '非法模式拒绝');
+}));
+
+test('Tunnel Token（issue #66）：设置/清除持久化；过短/非法字符拒绝', () => withHome(async () => {
+  const { tunnelToken, setTunnelToken, settingsPath } = await import('../lib/settings.mjs');
+  const tok = 'eyJhIjoiY2xvdWRmbGFyZS10b2tlbi1leGFtcGxlLXZhbHVlIn0';
+  assert.equal(tunnelToken(), '', '默认未配置');
+  assert.equal(setTunnelToken(tok), tok, '设置成功');
+  assert.equal(tunnelToken(), tok, '持久化生效');
+  const raw = JSON.parse(readFileSync(settingsPath(), 'utf8'));
+  assert.equal(raw.tunnelToken, tok, 'settings.json 内容正确');
+  assert.throws(() => setTunnelToken('short'), /Token/, '过短拒绝');
+  assert.throws(() => setTunnelToken('has space in it and that is bad!!'), /Token/, '非法字符拒绝');
+  assert.equal(setTunnelToken(''), '', '空字符串清除');
+  assert.equal(tunnelToken(), '', '清除生效');
+}));
+
+test('固定域名（issue #66）：URL 粘贴归一化、设置/清除持久化、非法域名拒绝', () => withHome(async () => {
+  const { tunnelHostname, setTunnelHostname } = await import('../lib/settings.mjs');
+  assert.equal(tunnelHostname(), '', '默认未配置');
+  // 粘贴完整 URL → 归一化为裸域名
+  assert.equal(setTunnelHostname('https://Pocket.Example.com/'), 'pocket.example.com', 'URL 归一化（含大小写）');
+  assert.equal(tunnelHostname(), 'pocket.example.com', '持久化生效');
+  assert.equal(setTunnelHostname(' sub.other.org:443 '), 'sub.other.org', '带端口/空白归一化');
+  assert.throws(() => setTunnelHostname('localhost'), /域名/, '无点主机名拒绝（那是局域网域）');
+  assert.throws(() => setTunnelHostname('192.168.1.5'), /域名/, '裸 IP 拒绝');
+  assert.throws(() => setTunnelHostname('bad host name'), /域名/, '含空格拒绝');
+  assert.equal(setTunnelHostname(''), '', '空字符串清除');
+  assert.equal(tunnelHostname(), '', '清除生效');
+}));

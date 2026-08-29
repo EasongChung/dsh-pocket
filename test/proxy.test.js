@@ -796,3 +796,30 @@ test('advancedNoticeScript：注入 advanced 模式提示覆盖层（issue #19�
   assert.ok(s.includes('compatibility'), '提示切回 compatibility');
   assert.ok(s.includes('position:fixed'), '固定覆盖层（白屏也能看到）');
 });
+
+// ---------- Host 信任边界（issue #66：fail closed） ----------
+
+test('classifyHost（issue #66）：loopback/私网归类，陌生域名一律 public（fail closed）', async () => {
+  const { classifyHost } = await import('../lib/proxy.mjs');
+  // loopback：本机与 cloudflared 回连
+  assert.equal(classifyHost('localhost'), 'loopback');
+  assert.equal(classifyHost('localhost:3081'), 'loopback');
+  assert.equal(classifyHost('127.0.0.1'), 'loopback');
+  assert.equal(classifyHost('127.0.0.1:3081'), 'loopback');
+  assert.equal(classifyHost('[::1]:3081'), 'loopback');
+  assert.equal(classifyHost('0.0.0.0'), 'loopback');
+  assert.equal(classifyHost(''), 'loopback');
+  // lan：RFC1918 私网 / IPv6 ULA / mDNS / NetBIOS 单标签名
+  assert.equal(classifyHost('192.168.1.5:3081'), 'lan');
+  assert.equal(classifyHost('10.0.0.2'), 'lan');
+  assert.equal(classifyHost('172.16.3.4'), 'lan');
+  assert.equal(classifyHost('172.32.1.1'), 'public', '172.32 不在 RFC1918 范围');
+  assert.equal(classifyHost('fd00::5'), 'lan');
+  assert.equal(classifyHost('fe80::1%en0'), 'lan');
+  assert.equal(classifyHost('mypc.local'), 'lan');
+  assert.equal(classifyHost('DESKTOP-ABC123'), 'lan');
+  // public：trycloudflare 及一切陌生域名（自建命名隧道固定域名）→ 强制公网密码
+  assert.equal(classifyHost('abc-def-hij.trycloudflare.com'), 'public');
+  assert.equal(classifyHost('pocket.example.com'), 'public');
+  assert.equal(classifyHost('random.host.org'), 'public');
+});

@@ -5,6 +5,7 @@ export const POCKET_ENDPOINTS = Object.freeze({
   status: 'pocket.status',
   tunnelStart: 'tunnel.start',
   tunnelStop: 'tunnel.stop',
+  tunnelSetConfig: 'tunnel.setConfig',
   version: 'pocket.version',
   update: 'pocket.update',
   restart: 'pocket.restart',
@@ -62,6 +63,7 @@ export function redactStatus(s) {
     tunnelUrl: s?.tunnelUrl ?? null,
     tunnelQr: s?.tunnelQr ?? null,
     tunnelState: s?.tunnelState ?? { phase: 'idle' },
+    tunnelConfig: s?.tunnelConfig ?? { mode: 'quick', hostname: '', tokenSet: false },
     dshPort: s?.dshPort ?? null,
   };
 }

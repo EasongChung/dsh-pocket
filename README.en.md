@@ -44,6 +44,7 @@ What it looks like — the phone shows the exact same UI as your computer, live:
 | 📶 LAN QR access | Works out of the box: Settings → Phone access — scan the LAN QR on the same Wi-Fi (auto-detects the LAN IP; **under WSL it picks the Windows host's physical NIC IP**) |
 | 🚪 LAN switch | **Turn LAN access off/on with one click** in Settings (a confirmation dialog shows each time): off kills the LAN QR code and link instantly; public access is unaffected |
 | 🌐 Public QR (from anywhere) | Click "Enable anywhere" → cloudflared tunnel → scan the public QR over 4G / any network |
+| 🏷️ Fixed public hostname | Optional "**Named tunnel**" mode: paste a Cloudflare Tunnel Token + your own domain — the public address stays **fixed across restarts** (see below) |
 | 🔐 Access PIN | Public links require an **8-character PIN** (rotated on every tunnel start by default; **customizable to a fixed PIN** — custom PINs are not rotated); LAN has its own separate **8-character PIN** (on by default; switchable off in Settings — then LAN scans connect directly) |
 | 🔑 Custom PINs | Both the public and LAN PINs can be **set to your own fixed 8-character PIN (letters and digits) in Settings** (custom PINs are never auto-rotated) |
 | 🧘 Session persistence | Enter the PIN once and you're set for a long time (login is tied to the computer's dsh web process: as long as it stays up, the phone won't ask again; **after a dsh web restart/update, enter it once more**) |
@@ -95,6 +96,17 @@ On the same page click "**Enable anywhere**" → **a security disclaimer pops up
 
 > Upgrading: `dsh plugin --profile web update dsh-pocket --latest -w` (`--latest` is required across major versions — a `^0.x` range won't auto-jump to 1.x).
 
+### Fixed public hostname (named tunnel, optional)
+
+The default "quick tunnel" gets a new random URL on every restart. For a **fixed public address**, use a Cloudflare **named tunnel** (requires a Cloudflare account + your own domain):
+
+1. In [Cloudflare Zero Trust](https://one.dash.cloudflare.com/) → **Networks → Tunnels**, create a Tunnel and copy the **Tunnel Token**
+2. In that Tunnel's **Public Hostname**, point your domain (e.g. `pocket.example.com`) to `http://127.0.0.1:3081`
+3. Back in the settings page's public section: switch the mode to "**Named tunnel**", paste the Tunnel Token, enter the fixed hostname, and save
+4. Click "Enable anywhere" → the public address is now your own hostname and **survives restarts**
+
+Note: in named-tunnel mode the public PIN is **not auto-rotated** (the address is fixed, so the PIN stays the same across restarts) — manage it proactively with a custom PIN. The Tunnel Token is stored locally only (`$DSH_HOME/dsh-pocket/settings.json`, readable by your user only) and is never echoed back in the UI.
+
 ## ⚠️ Security (read first)
 
 - **DSH can execute code on your computer.** **LAN** QR/URL plus its own **8-character PIN** is the key (PIN **on by default**, switchable off — then LAN scans connect directly, same-network devices only) — **never share the LAN QR, URL or PIN**.
@@ -102,7 +114,8 @@ On the same page click "**Enable anywhere**" → **a security disclaimer pops up
 - **Public** access is protected by an **8-character PIN**: the link is random, the PIN rotates on every tunnel start by default, and old links die instantly — even a leaked link can't get in. **A custom PIN is never auto-rotated** (your value stays stable; custom PINs may use letters and digits).
 - Phone login state is tied to the computer's dsh web process: **no re-entry while dsh web stays up; one re-entry after a restart/update**.
 - **Login rate limiting** (anti brute-force): **5** consecutive wrong PINs from the same IP lock it for **60s**; a global failure threshold briefly locks everyone (blocks distributed IP-rotation scans); a successful login resets the counter.
-- The public URL is randomly assigned by cloudflared and **changes on every restart** (old links die automatically — a natural key rotation).
+- The public URL is randomly assigned by cloudflared and **changes on every restart** (old links die automatically — a natural key rotation); in **named-tunnel fixed-hostname** mode the address stays and the PIN is not auto-rotated — manage it with a custom PIN.
+- **Public detection is fail-closed** (issue #66): everything except loopback and private LAN addresses is treated as **public and PIN-gated** — including any self-hosted tunnel / reverse proxy pointing at the local port with its own hostname. There is no "change the domain to bypass the PIN" hole.
 - LAN mode exposes nothing publicly; only devices on the same network can reach it.
 - Built for personal use; the public PIN lives in `$DSH_HOME/dsh-pocket/token` (re-rolled per tunnel start unless customized), the LAN PIN in `$DSH_HOME/dsh-pocket/token-lan` (refreshed manually in Settings), and switches/custom flags in `$DSH_HOME/dsh-pocket/settings.json`.
 

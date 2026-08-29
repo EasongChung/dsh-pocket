@@ -169,6 +169,12 @@ function PocketSettingsTab({ rpcCall, t }) {
   const [disclaimerChecked, setDisclaimerChecked] = useState(false);
 
   const doStartTunnel = async () => {
+    // 命名隧道模式：Token/域名没配齐就不发起（服务端同样会拒绝）
+    const cfg = status?.tunnelConfig;
+    if (cfg?.mode === 'named' && (!cfg.hostname || !cfg.tokenSet)) {
+      setError(t('namedNeedCfg'));
+      return;
+    }
     setBusy(true);
     setError(null);
     setTunnelState({ phase: 'starting', detail: '正在开启…', startedAt: Date.now() });
@@ -193,6 +199,25 @@ function PocketSettingsTab({ rpcCall, t }) {
 
   const stopTunnel = async () => {
     try { setStatus(await call(POCKET_ENDPOINTS.tunnelStop, {})); } catch { /* 忽略 */ }
+  };
+
+  // 公网模式（issue #66）：随机域名（默认零配置）/ 固定域名（Cloudflare 命名隧道 + Tunnel Token）
+  // tunnelCfg：编辑态 { hostname, token, err } | null；token 输入留空 = 保持已存的 Token 不变
+  const [tunnelCfg, setTunnelCfg] = useState(null);
+  const switchToQuick = async () => {
+    try { setStatus(await call(POCKET_ENDPOINTS.tunnelSetConfig, { mode: 'quick' })); } catch (err) { setError(err.message); }
+  };
+  const saveNamedTunnel = async () => {
+    try {
+      setStatus(await call(POCKET_ENDPOINTS.tunnelSetConfig, {
+        mode: 'named',
+        hostname: tunnelCfg?.hostname ?? '',
+        token: tunnelCfg?.token || undefined, // 留空不覆盖已存 Token
+      }));
+      setTunnelCfg(null);
+    } catch (err) {
+      setTunnelCfg((c) => ({ ...c, err: err.message }));
+    }
   };
 
   // 刷新局域网访问密码（旧密码立即作废）
@@ -279,6 +304,9 @@ function PocketSettingsTab({ rpcCall, t }) {
   const tunnelStarting = ['downloading', 'starting', 'registering'].includes(tunnelPhase);
   const tunnelStateDetail = tunnelState?.detail ?? '';
   const tunnelStateStarted = tunnelState?.startedAt ?? null;
+  // 公网模式视图（issue #66）：{ mode, hostname, tokenSet }
+  const tunnelModeView = status?.tunnelConfig ?? { mode: 'quick', hostname: '', tokenSet: false };
+  const namedMode = tunnelModeView.mode === 'named';
 
   return h('div', { style: styles.card },
     h('div', { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 } },
@@ -400,7 +428,7 @@ function PocketSettingsTab({ rpcCall, t }) {
         ? h('div', null,
           h('img', { src: status.tunnelQr, alt: 'Tunnel QR', style: styles.qr }),
           h('div', { style: styles.code }, tunnelUrl),
-          h('div', { style: styles.muted }, t('wanHint')),
+          h('div', { style: styles.muted }, namedMode ? t('namedRunningHint') : t('wanHint')),
           status.accessToken
             ? (customPin?.which === 'public'
                 ? customPinRow('public')
@@ -408,11 +436,62 @@ function PocketSettingsTab({ rpcCall, t }) {
                   fmt(t, status?.publicPinCustom ? 'wanPinCustom' : 'wanPin', { pin: status.accessToken }),
                   customBtn('public'),
                   status?.publicPinCustom ? h('div', { style: { marginTop: 2, fontSize: 11, color: 'var(--dsw-alias-state-warn-primary,#b45309)' } }, t('pinCustomHint')) : null,
+                  namedMode ? h('div', { style: { marginTop: 2, fontSize: 11, color: 'var(--dsw-alias-state-warn-primary,#b45309)' } }, t('namedSecurity')) : null,
                 ))
             : null,
           h('button', { style: styles.btn, onClick: stopTunnel }, t('stopTunnel')),
         )
         : h('div', null,
+          // 公网模式（issue #66）：随机域名（默认）/ 固定域名（命名隧道）
+          h('div', { style: { display: 'flex', alignItems: 'center', gap: 8, marginTop: 8, flexWrap: 'wrap' } },
+            h('span', { style: { fontSize: 12, color: 'var(--dsw-alias-label-secondary,#6b7280)' } }, t('tunnelMode')),
+            h('button', {
+              style: { ...styles.btn, height: 28, padding: '0 12px', fontSize: 12, fontWeight: !namedMode ? 600 : 400, background: !namedMode ? 'var(--dsw-alias-button-primary-fill, var(--dsw-alias-brand-primary,#4f6ef7))' : 'var(--dsw-alias-bg-layer-1,#fff)', color: !namedMode ? 'var(--dsw-alias-label-primary-foreground, #fff)' : 'var(--dsw-alias-label-primary,inherit)' },
+              onClick: namedMode ? switchToQuick : undefined,
+            }, t('modeQuick')),
+            h('button', {
+              style: { ...styles.btn, height: 28, padding: '0 12px', fontSize: 12, fontWeight: namedMode ? 600 : 400, background: namedMode ? 'var(--dsw-alias-button-primary-fill, var(--dsw-alias-brand-primary,#4f6ef7))' : 'var(--dsw-alias-bg-layer-1,#fff)', color: namedMode ? 'var(--dsw-alias-label-primary-foreground, #fff)' : 'var(--dsw-alias-label-primary,inherit)' },
+              onClick: () => setTunnelCfg(tunnelCfg ? null : { hostname: tunnelModeView.hostname ?? '', token: '', err: null }),
+            }, t('modeNamed')),
+          ),
+          // 固定域名：已保存的摘要 + 「修改」入口（非编辑态）
+          namedMode && !tunnelCfg ? h('div', { style: { marginTop: 6, fontSize: 12, color: 'var(--dsw-alias-label-secondary,#6b7280)', lineHeight: 1.5 } },
+            fmt(t, 'namedSummary', { host: tunnelModeView.hostname || '—', token: tunnelModeView.tokenSet ? t('namedTokenSet') : t('namedTokenMissing') }),
+            h('button', { style: { ...styles.btn, height: 26, padding: '0 10px', fontSize: 12, marginLeft: 8 }, onClick: () => setTunnelCfg({ hostname: tunnelModeView.hostname ?? '', token: '', err: null }) }, t('namedEdit')),
+            h('div', { style: { ...styles.muted, marginTop: 4 } }, t('namedHow')),
+            !tunnelModeView.tokenSet || !tunnelModeView.hostname ? h('div', { style: { marginTop: 2, fontSize: 12, color: 'var(--dsw-alias-state-error-primary,#dc2626)' } }, t('namedNeedCfg')) : null,
+          ) : null,
+          // 固定域名：编辑表单（域名 + Tunnel Token，Token 留空保持不变）
+          tunnelCfg ? h('div', { style: { marginTop: 8, fontSize: 12, color: 'var(--dsw-alias-label-secondary,#6b7280)', lineHeight: 1.6 } },
+            h('div', null,
+              t('namedHostnameLabel'),
+              h('input', {
+                style: { margin: '4px 0 0 6px', padding: '4px 8px', fontSize: 13, border: '1px solid var(--dsw-alias-border-l2,#d1d5db)', borderRadius: 6, outline: 'none', width: 200 },
+                placeholder: 'pocket.example.com',
+                value: tunnelCfg.hostname ?? '',
+                autoFocus: true,
+                onChange: (e) => setTunnelCfg((c) => ({ ...c, hostname: e.target.value.trim(), err: null })),
+                onKeyDown: (e) => { if (e.key === 'Enter') saveNamedTunnel(); if (e.key === 'Escape') setTunnelCfg(null); },
+              }),
+            ),
+            h('div', { style: { marginTop: 6 } },
+              t('namedTokenLabel'),
+              h('input', {
+                style: { margin: '4px 0 0 6px', padding: '4px 8px', fontSize: 13, border: '1px solid var(--dsw-alias-border-l2,#d1d5db)', borderRadius: 6, outline: 'none', width: 240, fontFamily: 'ui-monospace,Menlo,monospace' },
+                type: 'password',
+                value: tunnelCfg.token ?? '',
+                onChange: (e) => setTunnelCfg((c) => ({ ...c, token: e.target.value.trim(), err: null })),
+                onKeyDown: (e) => { if (e.key === 'Enter') saveNamedTunnel(); if (e.key === 'Escape') setTunnelCfg(null); },
+              }),
+            ),
+            h('div', { style: { marginTop: 6, display: 'flex', gap: 8 } },
+              h('button', { style: { ...styles.btn, height: 26, padding: '0 10px', fontSize: 12 }, onClick: saveNamedTunnel }, t('save')),
+              h('button', { style: { ...styles.btn, height: 26, padding: '0 10px', fontSize: 12 }, onClick: () => setTunnelCfg(null) }, t('cancel')),
+            ),
+            h('div', { style: { ...styles.muted, marginTop: 6 } }, t('namedHow')),
+            h('div', { style: { marginTop: 2, fontSize: 11, color: 'var(--dsw-alias-state-warn-primary,#b45309)', lineHeight: 1.5 } }, t('namedSecurity')),
+            tunnelCfg.err ? h('div', { style: { color: 'var(--dsw-alias-state-error-primary,#dc2626)', marginTop: 4 } }, tunnelCfg.err) : null,
+          ) : null,
           h('button', { style: { ...styles.primary, margin: '8px 0' }, onClick: startTunnel, disabled: busy || tunnelStarting }, busy ? t('opening') : t('enable')),
           tunnelStarting
             ? h('div', { style: { marginTop: 4, fontSize: 12, color: 'var(--dsw-alias-label-secondary,#6b7280)' } },

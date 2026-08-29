@@ -45,6 +45,7 @@ var POCKET_ENDPOINTS = Object.freeze({
   status: "pocket.status",
   tunnelStart: "tunnel.start",
   tunnelStop: "tunnel.stop",
+  tunnelSetConfig: "tunnel.setConfig",
   version: "pocket.version",
   update: "pocket.update",
   restart: "pocket.restart",
@@ -95,6 +96,7 @@ function redactStatus(s) {
     tunnelUrl: s?.tunnelUrl ?? null,
     tunnelQr: s?.tunnelQr ?? null,
     tunnelState: s?.tunnelState ?? { phase: "idle" },
+    tunnelConfig: s?.tunnelConfig ?? { mode: "quick", hostname: "", tokenSet: false },
     dshPort: s?.dshPort ?? null
   };
 }
@@ -1396,6 +1398,19 @@ var zh2 = {
   "stopTunnel": "\u5173\u95ED\u516C\u7F51",
   "enable": "\u5F00\u542F\u516C\u7F51\u8BBF\u95EE",
   "opening": "\u5F00\u542F\u4E2D\u2026",
+  "tunnelMode": "\u516C\u7F51\u6A21\u5F0F\uFF1A",
+  "modeQuick": "\u968F\u673A\u57DF\u540D\uFF08\u9ED8\u8BA4\uFF09",
+  "modeNamed": "\u56FA\u5B9A\u57DF\u540D",
+  "namedSummary": "\u56FA\u5B9A\u57DF\u540D\uFF1A{host} \xB7 Token {token}",
+  "namedTokenSet": "\u5DF2\u914D\u7F6E",
+  "namedTokenMissing": "\u672A\u914D\u7F6E",
+  "namedEdit": "\u4FEE\u6539",
+  "namedHostnameLabel": "\u56FA\u5B9A\u57DF\u540D\uFF1A",
+  "namedTokenLabel": "Tunnel Token\uFF08\u7559\u7A7A = \u4FDD\u6301\u4E0D\u53D8\uFF09\uFF1A",
+  "namedHow": "\u5728 Cloudflare Zero Trust \u2192 Networks \u2192 Tunnels \u521B\u5EFA\u96A7\u9053\u5E76\u590D\u5236 Token\uFF1B\u628A\u57DF\u540D\u7684 Service \u6307\u5411 http://127.0.0.1:3081\uFF08\u4EE3\u7406\u7AEF\u53E3\uFF09\u3002\u5730\u5740\u56FA\u5B9A\uFF0C\u91CD\u542F\u4E0D\u518D\u53D8\u5316\u3002",
+  "namedSecurity": "\u56FA\u5B9A\u57DF\u540D\u957F\u671F\u66B4\u9732\u5728\u516C\u7F51\u3001\u66F4\u6613\u88AB\u626B\u63CF\uFF0C\u5EFA\u8BAE\u540C\u65F6\u8BBE\u7F6E\u81EA\u5B9A\u4E49\u5F3A\u5BC6\u7801\uFF08\u672C\u6A21\u5F0F\u516C\u7F51\u5BC6\u7801\u9ED8\u8BA4\u4E0D\u968F\u91CD\u542F\u8F6E\u6362\uFF09\u3002",
+  "namedNeedCfg": "\u8BF7\u5148\u586B\u5199\u56FA\u5B9A\u57DF\u540D\u4E0E Tunnel Token",
+  "namedRunningHint": "\u56FA\u5B9A\u57DF\u540D\uFF08Cloudflare \u547D\u540D\u96A7\u9053\uFF09\u2014\u2014\u5730\u5740\u4E0D\u968F\u91CD\u542F\u53D8\u5316",
   "disclaimerTitle": "\u26A0\uFE0F \u5B89\u5168\u514D\u8D23\u58F0\u660E",
   "disclaimerBody": "\u5F00\u542F\u516C\u7F51 = \u628A\u672C\u673A DSH\uFF08\u80FD\u6267\u884C\u4EE3\u7801\uFF09\u66B4\u9732\u5230\u4E92\u8054\u7F51\u3002\u4EFB\u4F55\u4EBA\u62FF\u5230\u516C\u7F51\u94FE\u63A5\u548C\u5BC6\u7801\uFF0C\u90FD\u80FD\u8BBF\u95EE\u751A\u81F3\u64CD\u4F5C\u4F60\u7684\u7535\u8111\u3002\u8BF7\u786E\u8BA4\uFF1A\u2460 \u4F7F\u7528\u81EA\u5B9A\u4E49\u5F3A\u5BC6\u7801\u6216\u59A5\u5584\u4FDD\u7BA1\u81EA\u52A8\u5BC6\u7801\uFF1B\u2461 \u7528\u5B8C\u7ACB\u5373\u300C\u5173\u95ED\u516C\u7F51\u300D\uFF1B\u2462 \u516C\u53F8/\u6D89\u5BC6\u7F51\u7EDC\u8BF7\u5148\u786E\u8BA4\u5408\u89C4\u3002",
   "disclaimerAgree": "\u6211\u5DF2\u77E5\u60C5\uFF0C\u540C\u610F\u5F00\u542F",
@@ -1465,6 +1480,19 @@ var en2 = {
   "stopTunnel": "Stop",
   "enable": "Enable anywhere",
   "opening": "Enabling\u2026",
+  "tunnelMode": "Mode:",
+  "modeQuick": "Random URL (default)",
+  "modeNamed": "Fixed domain",
+  "namedSummary": "Fixed domain: {host} \xB7 Token {token}",
+  "namedTokenSet": "configured",
+  "namedTokenMissing": "not set",
+  "namedEdit": "Edit",
+  "namedHostnameLabel": "Fixed domain:",
+  "namedTokenLabel": "Tunnel Token (blank = keep current):",
+  "namedHow": "Create a tunnel in Cloudflare Zero Trust \u2192 Networks \u2192 Tunnels and copy the token; point the hostname's Service at http://127.0.0.1:3081 (the proxy port). The URL stays fixed across restarts.",
+  "namedSecurity": "A fixed domain is long-lived and easier to scan \u2014 set a strong custom PIN too (the public PIN is not rotated on restart in this mode).",
+  "namedNeedCfg": "Set the fixed domain and Tunnel Token first",
+  "namedRunningHint": "Fixed domain (Cloudflare named tunnel) \u2014 the URL no longer changes on restart",
   "disclaimerTitle": "\u26A0\uFE0F Security disclaimer",
   "disclaimerBody": "Enabling public access exposes this computer\u2019s DSH (which can execute code) to the internet. Anyone with the public link and PIN can reach \u2014 and operate \u2014 your computer. Please confirm: \u2460 use a strong custom PIN or keep the auto-generated one safe; \u2461 turn public access OFF as soon as you\u2019re done; \u2462 on a corporate/classified network, confirm compliance first.",
   "disclaimerAgree": "I understand and agree",
@@ -1612,6 +1640,11 @@ function PocketSettingsTab({ rpcCall, t }) {
   const [disclaimerOpen, setDisclaimerOpen] = (0, import_react2.useState)(false);
   const [disclaimerChecked, setDisclaimerChecked] = (0, import_react2.useState)(false);
   const doStartTunnel = async () => {
+    const cfg = status?.tunnelConfig;
+    if (cfg?.mode === "named" && (!cfg.hostname || !cfg.tokenSet)) {
+      setError(t("namedNeedCfg"));
+      return;
+    }
     setBusy(true);
     setError(null);
     setTunnelState({ phase: "starting", detail: "\u6B63\u5728\u5F00\u542F\u2026", startedAt: Date.now() });
@@ -1636,6 +1669,27 @@ function PocketSettingsTab({ rpcCall, t }) {
     try {
       setStatus(await call(POCKET_ENDPOINTS.tunnelStop, {}));
     } catch {
+    }
+  };
+  const [tunnelCfg, setTunnelCfg] = (0, import_react2.useState)(null);
+  const switchToQuick = async () => {
+    try {
+      setStatus(await call(POCKET_ENDPOINTS.tunnelSetConfig, { mode: "quick" }));
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+  const saveNamedTunnel = async () => {
+    try {
+      setStatus(await call(POCKET_ENDPOINTS.tunnelSetConfig, {
+        mode: "named",
+        hostname: tunnelCfg?.hostname ?? "",
+        token: tunnelCfg?.token || void 0
+        // 留空不覆盖已存 Token
+      }));
+      setTunnelCfg(null);
+    } catch (err) {
+      setTunnelCfg((c) => ({ ...c, err: err.message }));
     }
   };
   const refreshLanPin = async () => {
@@ -1715,6 +1769,8 @@ function PocketSettingsTab({ rpcCall, t }) {
   const tunnelStarting = ["downloading", "starting", "registering"].includes(tunnelPhase);
   const tunnelStateDetail = tunnelState?.detail ?? "";
   const tunnelStateStarted = tunnelState?.startedAt ?? null;
+  const tunnelModeView = status?.tunnelConfig ?? { mode: "quick", hostname: "", tokenSet: false };
+  const namedMode = tunnelModeView.mode === "named";
   return (0, import_react2.createElement)(
     "div",
     { style: styles.card },
@@ -1851,18 +1907,87 @@ function PocketSettingsTab({ rpcCall, t }) {
         null,
         (0, import_react2.createElement)("img", { src: status.tunnelQr, alt: "Tunnel QR", style: styles.qr }),
         (0, import_react2.createElement)("div", { style: styles.code }, tunnelUrl),
-        (0, import_react2.createElement)("div", { style: styles.muted }, t("wanHint")),
+        (0, import_react2.createElement)("div", { style: styles.muted }, namedMode ? t("namedRunningHint") : t("wanHint")),
         status.accessToken ? customPin?.which === "public" ? customPinRow("public") : (0, import_react2.createElement)(
           "div",
           { style: { marginTop: 6, fontSize: 12, color: "var(--dsw-alias-label-secondary,#6b7280)", lineHeight: 1.5 } },
           fmt(t, status?.publicPinCustom ? "wanPinCustom" : "wanPin", { pin: status.accessToken }),
           customBtn("public"),
-          status?.publicPinCustom ? (0, import_react2.createElement)("div", { style: { marginTop: 2, fontSize: 11, color: "var(--dsw-alias-state-warn-primary,#b45309)" } }, t("pinCustomHint")) : null
+          status?.publicPinCustom ? (0, import_react2.createElement)("div", { style: { marginTop: 2, fontSize: 11, color: "var(--dsw-alias-state-warn-primary,#b45309)" } }, t("pinCustomHint")) : null,
+          namedMode ? (0, import_react2.createElement)("div", { style: { marginTop: 2, fontSize: 11, color: "var(--dsw-alias-state-warn-primary,#b45309)" } }, t("namedSecurity")) : null
         ) : null,
         (0, import_react2.createElement)("button", { style: styles.btn, onClick: stopTunnel }, t("stopTunnel"))
       ) : (0, import_react2.createElement)(
         "div",
         null,
+        // 公网模式（issue #66）：随机域名（默认）/ 固定域名（命名隧道）
+        (0, import_react2.createElement)(
+          "div",
+          { style: { display: "flex", alignItems: "center", gap: 8, marginTop: 8, flexWrap: "wrap" } },
+          (0, import_react2.createElement)("span", { style: { fontSize: 12, color: "var(--dsw-alias-label-secondary,#6b7280)" } }, t("tunnelMode")),
+          (0, import_react2.createElement)("button", {
+            style: { ...styles.btn, height: 28, padding: "0 12px", fontSize: 12, fontWeight: !namedMode ? 600 : 400, background: !namedMode ? "var(--dsw-alias-button-primary-fill, var(--dsw-alias-brand-primary,#4f6ef7))" : "var(--dsw-alias-bg-layer-1,#fff)", color: !namedMode ? "var(--dsw-alias-label-primary-foreground, #fff)" : "var(--dsw-alias-label-primary,inherit)" },
+            onClick: namedMode ? switchToQuick : void 0
+          }, t("modeQuick")),
+          (0, import_react2.createElement)("button", {
+            style: { ...styles.btn, height: 28, padding: "0 12px", fontSize: 12, fontWeight: namedMode ? 600 : 400, background: namedMode ? "var(--dsw-alias-button-primary-fill, var(--dsw-alias-brand-primary,#4f6ef7))" : "var(--dsw-alias-bg-layer-1,#fff)", color: namedMode ? "var(--dsw-alias-label-primary-foreground, #fff)" : "var(--dsw-alias-label-primary,inherit)" },
+            onClick: () => setTunnelCfg(tunnelCfg ? null : { hostname: tunnelModeView.hostname ?? "", token: "", err: null })
+          }, t("modeNamed"))
+        ),
+        // 固定域名：已保存的摘要 + 「修改」入口（非编辑态）
+        namedMode && !tunnelCfg ? (0, import_react2.createElement)(
+          "div",
+          { style: { marginTop: 6, fontSize: 12, color: "var(--dsw-alias-label-secondary,#6b7280)", lineHeight: 1.5 } },
+          fmt(t, "namedSummary", { host: tunnelModeView.hostname || "\u2014", token: tunnelModeView.tokenSet ? t("namedTokenSet") : t("namedTokenMissing") }),
+          (0, import_react2.createElement)("button", { style: { ...styles.btn, height: 26, padding: "0 10px", fontSize: 12, marginLeft: 8 }, onClick: () => setTunnelCfg({ hostname: tunnelModeView.hostname ?? "", token: "", err: null }) }, t("namedEdit")),
+          (0, import_react2.createElement)("div", { style: { ...styles.muted, marginTop: 4 } }, t("namedHow")),
+          !tunnelModeView.tokenSet || !tunnelModeView.hostname ? (0, import_react2.createElement)("div", { style: { marginTop: 2, fontSize: 12, color: "var(--dsw-alias-state-error-primary,#dc2626)" } }, t("namedNeedCfg")) : null
+        ) : null,
+        // 固定域名：编辑表单（域名 + Tunnel Token，Token 留空保持不变）
+        tunnelCfg ? (0, import_react2.createElement)(
+          "div",
+          { style: { marginTop: 8, fontSize: 12, color: "var(--dsw-alias-label-secondary,#6b7280)", lineHeight: 1.6 } },
+          (0, import_react2.createElement)(
+            "div",
+            null,
+            t("namedHostnameLabel"),
+            (0, import_react2.createElement)("input", {
+              style: { margin: "4px 0 0 6px", padding: "4px 8px", fontSize: 13, border: "1px solid var(--dsw-alias-border-l2,#d1d5db)", borderRadius: 6, outline: "none", width: 200 },
+              placeholder: "pocket.example.com",
+              value: tunnelCfg.hostname ?? "",
+              autoFocus: true,
+              onChange: (e) => setTunnelCfg((c) => ({ ...c, hostname: e.target.value.trim(), err: null })),
+              onKeyDown: (e) => {
+                if (e.key === "Enter") saveNamedTunnel();
+                if (e.key === "Escape") setTunnelCfg(null);
+              }
+            })
+          ),
+          (0, import_react2.createElement)(
+            "div",
+            { style: { marginTop: 6 } },
+            t("namedTokenLabel"),
+            (0, import_react2.createElement)("input", {
+              style: { margin: "4px 0 0 6px", padding: "4px 8px", fontSize: 13, border: "1px solid var(--dsw-alias-border-l2,#d1d5db)", borderRadius: 6, outline: "none", width: 240, fontFamily: "ui-monospace,Menlo,monospace" },
+              type: "password",
+              value: tunnelCfg.token ?? "",
+              onChange: (e) => setTunnelCfg((c) => ({ ...c, token: e.target.value.trim(), err: null })),
+              onKeyDown: (e) => {
+                if (e.key === "Enter") saveNamedTunnel();
+                if (e.key === "Escape") setTunnelCfg(null);
+              }
+            })
+          ),
+          (0, import_react2.createElement)(
+            "div",
+            { style: { marginTop: 6, display: "flex", gap: 8 } },
+            (0, import_react2.createElement)("button", { style: { ...styles.btn, height: 26, padding: "0 10px", fontSize: 12 }, onClick: saveNamedTunnel }, t("save")),
+            (0, import_react2.createElement)("button", { style: { ...styles.btn, height: 26, padding: "0 10px", fontSize: 12 }, onClick: () => setTunnelCfg(null) }, t("cancel"))
+          ),
+          (0, import_react2.createElement)("div", { style: { ...styles.muted, marginTop: 6 } }, t("namedHow")),
+          (0, import_react2.createElement)("div", { style: { marginTop: 2, fontSize: 11, color: "var(--dsw-alias-state-warn-primary,#b45309)", lineHeight: 1.5 } }, t("namedSecurity")),
+          tunnelCfg.err ? (0, import_react2.createElement)("div", { style: { color: "var(--dsw-alias-state-error-primary,#dc2626)", marginTop: 4 } }, tunnelCfg.err) : null
+        ) : null,
         (0, import_react2.createElement)("button", { style: { ...styles.primary, margin: "8px 0" }, onClick: startTunnel, disabled: busy || tunnelStarting }, busy ? t("opening") : t("enable")),
         tunnelStarting ? (0, import_react2.createElement)(
           "div",
