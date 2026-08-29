@@ -165,6 +165,76 @@ function PocketSettingsTab({ rpcCall, t }) {
 
   // 安全免责声明（issue #31）：每次开启公网都必须先弹框勾选「我已知情」。
   // 服务端同样强制（tunnel.start 需 disclaimer: true），防绕过前端直接调 RPC。
+  // 临时 PIN（issue #69）：表单、刚生成项、列表
+  const [tempPinForm, setTempPinForm] = useState({ kind: 'lan', expiresInSec: 86400, label: '' });
+  const [tempPinsList, setTempPinsList] = useState([]);
+  const [tempPinLast, setTempPinLast] = useState(null); // { value, kind, expiresAt, label }
+  const [tempPinBusy, setTempPinBusy] = useState(false);
+  const [tempPinError, setTempPinError] = useState(null);
+
+  const loadTempPins = async () => {
+    try {
+      const r = await call(POCKET_ENDPOINTS.tempPinList, {});
+      setTempPinsList(Array.isArray(r?.tempPins) ? r.tempPins : []);
+    } catch { /* 忽略 */ }
+  };
+  useEffect(() => { loadTempPins(); }, []);
+
+  // 每 30 秒刷新一次（让剩余时间实时倒计时显示）
+  useEffect(() => {
+    if (tempPinsList.length === 0 && !tempPinLast) return;
+    const t = setInterval(() => {
+      // 触发 setNow 已有的 tick 重新渲染即可；这里只重新拉一次（处理过期自动消失）
+      loadTempPins();
+    }, 30_000);
+    return () => clearInterval(t);
+  }, [tempPinsList.length, tempPinLast]);
+
+  const createTempPinNow = async () => {
+    setTempPinBusy(true);
+    setTempPinError(null);
+    try {
+      const r = await call(POCKET_ENDPOINTS.tempPinCreate, { kind: tempPinForm.kind, expiresInSec: tempPinForm.expiresInSec, label: tempPinForm.label });
+      setTempPinLast(r);
+      setTempPinForm((f) => ({ ...f, label: '' }));
+      await loadTempPins();
+    } catch (err) {
+      setTempPinError(err.message);
+    } finally {
+      setTempPinBusy(false);
+    }
+  };
+  const revokeTempPinNow = async (p) => {
+    try {
+      await call(POCKET_ENDPOINTS.tempPinRevoke, { value: p.value, kind: p.kind });
+      showToast(t('tempPinRevoked'));
+      if (tempPinLast?.value === p.value) setTempPinLast(null);
+      await loadTempPins();
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+  const copyTempPin = async (value) => {
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(value);
+        showToast(t('tempPinCopied'));
+      }
+    } catch { /* 忽略 */ }
+  };
+  const formatRemaining = (expiresAt) => {
+    const ms = expiresAt - Date.now();
+    if (ms <= 0) return '0s';
+    const s = Math.floor(ms / 1000);
+    if (s < 60) return `${s}s`;
+    const m = Math.floor(s / 60);
+    if (m < 60) return `${m}m`;
+    const h = Math.floor(m / 60);
+    if (h < 24) return `${h}h`;
+    const d = Math.floor(h / 24);
+    return `${d}d`;
+  };
+
   const [disclaimerOpen, setDisclaimerOpen] = useState(false);
   const [disclaimerChecked, setDisclaimerChecked] = useState(false);
 
@@ -553,6 +623,62 @@ function PocketSettingsTab({ rpcCall, t }) {
     ),
 
     error ? h('div', { style: { color: 'var(--dsw-alias-state-error-primary,#dc2626)', fontSize: 12, marginTop: 8 } }, `❌ ${errText(error)}`) : null,
+
+    // 临时 PIN（issue #69）：带过期的访问密码，给访客用
+    h('div', { style: styles.block },
+      h('div', { style: { fontWeight: 600, fontSize: 13, marginBottom: 4 } }, t('tempPinTitle')),
+      h('div', { style: { ...styles.muted, marginBottom: 10 } }, t('tempPinSubtitle')),
+      // 生成表单：分类 + 时长 + 备注 + 生成
+      h('div', { style: { display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' } },
+        h('select', {
+          value: tempPinForm.kind,
+          onChange: (e) => setTempPinForm((f) => ({ ...f, kind: e.target.value })),
+          style: { font: 'inherit', height: 30, padding: '0 8px', borderRadius: 8, border: '1px solid var(--dsw-alias-border-l2,#d1d5db)', background: 'var(--dsw-alias-bg-layer-1,#fff)', color: 'var(--dsw-alias-label-primary,inherit)' },
+        },
+          h('option', { value: 'public' }, t('tempPinKindPublic')),
+          h('option', { value: 'lan' }, t('tempPinKindLan')),
+        ),
+        h('select', {
+          value: String(tempPinForm.expiresInSec),
+          onChange: (e) => setTempPinForm((f) => ({ ...f, expiresInSec: Number(e.target.value) })),
+          style: { font: 'inherit', height: 30, padding: '0 8px', borderRadius: 8, border: '1px solid var(--dsw-alias-border-l2,#d1d5db)', background: 'var(--dsw-alias-bg-layer-1,#fff)', color: 'var(--dsw-alias-label-primary,inherit)' },
+        },
+          h('option', { value: '3600' }, t('tempPinDuration1h')),
+          h('option', { value: '86400' }, t('tempPinDuration24h')),
+          h('option', { value: '604800' }, t('tempPinDuration7d')),
+        ),
+        h('input', {
+          style: { flex: 1, minWidth: 120, height: 30, padding: '0 10px', borderRadius: 8, border: '1px solid var(--dsw-alias-border-l2,#d1d5db)', fontSize: 13, outline: 'none' },
+          placeholder: t('tempPinLabelPh'),
+          value: tempPinForm.label,
+          onChange: (e) => setTempPinForm((f) => ({ ...f, label: e.target.value })),
+          onKeyDown: (e) => { if (e.key === 'Enter') createTempPinNow(); },
+        }),
+        h('button', { style: { ...styles.btn, height: 30 }, onClick: createTempPinNow, disabled: tempPinBusy }, t('tempPinCreate')),
+      ),
+      // 错误展示
+      tempPinError ? h('div', { style: { color: 'var(--dsw-alias-state-error-primary,#dc2626)', fontSize: 12, marginTop: 6 } }, errText(tempPinError)) : null,
+      // 刚生成的那一个（高亮，下一秒会消失提示用户立刻复制）
+      tempPinLast ? h('div', { style: { marginTop: 10, padding: '8px 10px', borderRadius: 8, background: 'var(--dsw-alias-bg-layer-2,#f3f4f6)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' } },
+        h('div', null,
+          h('div', { style: { fontSize: 11, color: 'var(--dsw-alias-state-success-primary,#16a34a)', fontWeight: 600, marginBottom: 2 } }, `${t('tempPinCreated')} · ${tempPinLast.kind === 'public' ? t('tempPinKindPublic') : t('tempPinKindLan')} · ${formatRemaining(tempPinLast.expiresAt)}`),
+          h('span', { style: { fontFamily: 'ui-monospace,Menlo,monospace', fontSize: 16, letterSpacing: 2, fontWeight: 600 } }, tempPinLast.value),
+        ),
+        h('button', { style: { ...styles.btn, height: 28, padding: '0 12px', fontSize: 12 }, onClick: () => copyTempPin(tempPinLast.value) }, t('tempPinCopy')),
+      ) : null,
+      // 列表
+      h('div', { style: { marginTop: 12, borderTop: '1px solid var(--dsw-alias-border-l2,#e5e7eb)', paddingTop: 8 } },
+        tempPinsList.length === 0
+          ? h('div', { style: { ...styles.muted, padding: '6px 0' } }, t('tempPinEmpty'))
+          : tempPinsList.map((p) => h('div', { key: p.value, style: { display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0', borderBottom: '1px solid var(--dsw-alias-border-l2,#e5e7eb)' } },
+              h('span', { style: { fontSize: 11, color: 'var(--dsw-alias-label-tertiary,#8b93a1)', minWidth: 50 } }, p.kind === 'public' ? t('tempPinKindPublic') : t('tempPinKindLan')),
+              h('span', { style: { fontFamily: 'ui-monospace,Menlo,monospace', fontSize: 13, letterSpacing: 1, flexShrink: 0 } }, p.value),
+              h('span', { style: { ...styles.muted, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, p.label || '—'),
+              h('span', { style: { fontSize: 11, color: 'var(--dsw-alias-label-tertiary,#8b93a1)' } }, `${t('tempPinExpiresIn')} ${formatRemaining(p.expiresAt)}`),
+              h('button', { style: { ...styles.btn, height: 24, padding: '0 10px', fontSize: 11 }, onClick: () => revokeTempPinNow(p) }, t('tempPinRevoke')),
+            )),
+      ),
+    ),
 
     // 恢复出厂设置：设置出问题时的临时兜底（最底部，避免误触）
     h('div', { style: styles.block },

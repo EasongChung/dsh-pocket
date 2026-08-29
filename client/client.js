@@ -54,7 +54,10 @@ var POCKET_ENDPOINTS = Object.freeze({
   lanSetOverride: "lan.setOverride",
   lanSetEnabled: "lan.setEnabled",
   pinSetCustom: "pin.setCustom",
-  pocketReset: "pocket.reset"
+  pocketReset: "pocket.reset",
+  tempPinCreate: "tempPin.create",
+  tempPinList: "tempPin.list",
+  tempPinRevoke: "tempPin.revoke"
 });
 function compareVersions(a, b) {
   const pa = String(a).replace(/^[vV]/, "").split(".");
@@ -1552,7 +1555,26 @@ var zh2 = {
   "slowHint": " \u2014 \u6709\u70B9\u4E45\uFF1F\u68C0\u67E5\u662F\u5426\u5F00\u7740\u4EE3\u7406/VPN\uFF08Clash TUN \u7B49\uFF09",
   "error": "\u274C \u5F00\u542F\u5931\u8D25\uFF1A{detail}\uFF08\u53EF\u91CD\u8BD5\uFF1B\u82E5\u662F\u4EE3\u7406/VPN \u95EE\u9898\u89C1 README \u6392\u969C\uFF09",
   "unknownError": "\u672A\u77E5\u9519\u8BEF",
-  "feedback": "\u6709\u95EE\u9898\uFF1F\u6B22\u8FCE\u5230 GitHub Issues \u53CD\u9988 \u{1F64F}"
+  "feedback": "\u6709\u95EE\u9898\uFF1F\u6B22\u8FCE\u5230 GitHub Issues \u53CD\u9988 \u{1F64F}",
+  // 临时 PIN（issue #69）
+  "tempPinTitle": "\u4E34\u65F6\u8BBF\u95EE PIN\uFF08\u5E26\u8D85\u65F6\uFF09",
+  "tempPinSubtitle": "\u7ED9\u8BBF\u5BA2\u5F00\u4E00\u4E2A\u6709\u5BFF\u547D\u7684 8 \u4F4D PIN\uFF0C\u8FC7\u671F\u81EA\u52A8\u4F5C\u5E9F\uFF1B\u4E0E\u4E3B PIN \u5171\u7528\u901F\u7387\u9650\u5236\u3002",
+  "tempPinKindPublic": "\u516C\u7F51",
+  "tempPinKindLan": "\u5C40\u57DF\u7F51",
+  "tempPinDuration": "\u6709\u6548\u65F6\u957F",
+  "tempPinDuration1h": "1 \u5C0F\u65F6",
+  "tempPinDuration24h": "24 \u5C0F\u65F6",
+  "tempPinDuration7d": "7 \u5929",
+  "tempPinLabel": "\u5907\u6CE8\uFF08\u53EF\u9009\uFF0C\u7ED9\u8C01\u7528\uFF09",
+  "tempPinLabelPh": "\u670B\u53CB\u5C0F\u738B",
+  "tempPinCreate": "\u751F\u6210",
+  "tempPinCreated": "\u5DF2\u751F\u6210\uFF08\u4EC5\u663E\u793A\u4E00\u6B21\uFF09",
+  "tempPinCopied": "\u5DF2\u590D\u5236",
+  "tempPinCopy": "\u590D\u5236",
+  "tempPinEmpty": "\u6682\u65E0\u4E34\u65F6 PIN",
+  "tempPinExpiresIn": "\u8FC7\u671F",
+  "tempPinRevoke": "\u64A4\u9500",
+  "tempPinRevoked": "\u5DF2\u64A4\u9500"
 };
 var en2 = {
   "section": "Phone access",
@@ -1647,7 +1669,26 @@ var en2 = {
   "slowHint": " \u2014 taking long? Check for a proxy/VPN (e.g., Clash TUN)",
   "error": "\u274C Failed to enable: {detail} (you can retry; for proxy/VPN issues see the README)",
   "unknownError": "unknown error",
-  "feedback": "\u{1F64F} Questions? Open an issue on GitHub"
+  "feedback": "\u{1F64F} Questions? Open an issue on GitHub",
+  // Temp PIN (issue #69)
+  "tempPinTitle": "Temporary access PINs (auto-expire)",
+  "tempPinSubtitle": "Issue a time-limited 8-char PIN to a guest; expires automatically. Shares the main PIN rate limit.",
+  "tempPinKindPublic": "Public",
+  "tempPinKindLan": "LAN",
+  "tempPinDuration": "Valid for",
+  "tempPinDuration1h": "1 hour",
+  "tempPinDuration24h": "24 hours",
+  "tempPinDuration7d": "7 days",
+  "tempPinLabel": "Note (optional, who is this for)",
+  "tempPinLabelPh": "Friend Alice",
+  "tempPinCreate": "Create",
+  "tempPinCreated": "Created (shown once)",
+  "tempPinCopied": "Copied",
+  "tempPinCopy": "Copy",
+  "tempPinEmpty": "No temporary PINs yet",
+  "tempPinExpiresIn": "expires",
+  "tempPinRevoke": "Revoke",
+  "tempPinRevoked": "Revoked"
 };
 
 // client/index.jsx
@@ -1781,6 +1822,73 @@ function PocketSettingsTab({ rpcCall, t }) {
     } catch (err) {
       setUpdateInfo((u) => ({ ...u, updating: false, result: "fail", output: err.message }));
     }
+  };
+  const [tempPinForm, setTempPinForm] = (0, import_react2.useState)({ kind: "lan", expiresInSec: 86400, label: "" });
+  const [tempPinsList, setTempPinsList] = (0, import_react2.useState)([]);
+  const [tempPinLast, setTempPinLast] = (0, import_react2.useState)(null);
+  const [tempPinBusy, setTempPinBusy] = (0, import_react2.useState)(false);
+  const [tempPinError, setTempPinError] = (0, import_react2.useState)(null);
+  const loadTempPins = async () => {
+    try {
+      const r = await call(POCKET_ENDPOINTS.tempPinList, {});
+      setTempPinsList(Array.isArray(r?.tempPins) ? r.tempPins : []);
+    } catch {
+    }
+  };
+  (0, import_react2.useEffect)(() => {
+    loadTempPins();
+  }, []);
+  (0, import_react2.useEffect)(() => {
+    if (tempPinsList.length === 0 && !tempPinLast) return;
+    const t2 = setInterval(() => {
+      loadTempPins();
+    }, 3e4);
+    return () => clearInterval(t2);
+  }, [tempPinsList.length, tempPinLast]);
+  const createTempPinNow = async () => {
+    setTempPinBusy(true);
+    setTempPinError(null);
+    try {
+      const r = await call(POCKET_ENDPOINTS.tempPinCreate, { kind: tempPinForm.kind, expiresInSec: tempPinForm.expiresInSec, label: tempPinForm.label });
+      setTempPinLast(r);
+      setTempPinForm((f) => ({ ...f, label: "" }));
+      await loadTempPins();
+    } catch (err) {
+      setTempPinError(err.message);
+    } finally {
+      setTempPinBusy(false);
+    }
+  };
+  const revokeTempPinNow = async (p) => {
+    try {
+      await call(POCKET_ENDPOINTS.tempPinRevoke, { value: p.value, kind: p.kind });
+      showToast(t("tempPinRevoked"));
+      if (tempPinLast?.value === p.value) setTempPinLast(null);
+      await loadTempPins();
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+  const copyTempPin = async (value) => {
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(value);
+        showToast(t("tempPinCopied"));
+      }
+    } catch {
+    }
+  };
+  const formatRemaining = (expiresAt) => {
+    const ms = expiresAt - Date.now();
+    if (ms <= 0) return "0s";
+    const s = Math.floor(ms / 1e3);
+    if (s < 60) return `${s}s`;
+    const m = Math.floor(s / 60);
+    if (m < 60) return `${m}m`;
+    const h2 = Math.floor(m / 60);
+    if (h2 < 24) return `${h2}h`;
+    const d = Math.floor(h2 / 24);
+    return `${d}d`;
   };
   const [disclaimerOpen, setDisclaimerOpen] = (0, import_react2.useState)(false);
   const [disclaimerChecked, setDisclaimerChecked] = (0, import_react2.useState)(false);
@@ -2211,6 +2319,77 @@ function PocketSettingsTab({ rpcCall, t }) {
       ) : null
     ),
     error ? (0, import_react2.createElement)("div", { style: { color: "var(--dsw-alias-state-error-primary,#dc2626)", fontSize: 12, marginTop: 8 } }, `\u274C ${errText(error)}`) : null,
+    // 临时 PIN（issue #69）：带过期的访问密码，给访客用
+    (0, import_react2.createElement)(
+      "div",
+      { style: styles.block },
+      (0, import_react2.createElement)("div", { style: { fontWeight: 600, fontSize: 13, marginBottom: 4 } }, t("tempPinTitle")),
+      (0, import_react2.createElement)("div", { style: { ...styles.muted, marginBottom: 10 } }, t("tempPinSubtitle")),
+      // 生成表单：分类 + 时长 + 备注 + 生成
+      (0, import_react2.createElement)(
+        "div",
+        { style: { display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" } },
+        (0, import_react2.createElement)(
+          "select",
+          {
+            value: tempPinForm.kind,
+            onChange: (e) => setTempPinForm((f) => ({ ...f, kind: e.target.value })),
+            style: { font: "inherit", height: 30, padding: "0 8px", borderRadius: 8, border: "1px solid var(--dsw-alias-border-l2,#d1d5db)", background: "var(--dsw-alias-bg-layer-1,#fff)", color: "var(--dsw-alias-label-primary,inherit)" }
+          },
+          (0, import_react2.createElement)("option", { value: "public" }, t("tempPinKindPublic")),
+          (0, import_react2.createElement)("option", { value: "lan" }, t("tempPinKindLan"))
+        ),
+        (0, import_react2.createElement)(
+          "select",
+          {
+            value: String(tempPinForm.expiresInSec),
+            onChange: (e) => setTempPinForm((f) => ({ ...f, expiresInSec: Number(e.target.value) })),
+            style: { font: "inherit", height: 30, padding: "0 8px", borderRadius: 8, border: "1px solid var(--dsw-alias-border-l2,#d1d5db)", background: "var(--dsw-alias-bg-layer-1,#fff)", color: "var(--dsw-alias-label-primary,inherit)" }
+          },
+          (0, import_react2.createElement)("option", { value: "3600" }, t("tempPinDuration1h")),
+          (0, import_react2.createElement)("option", { value: "86400" }, t("tempPinDuration24h")),
+          (0, import_react2.createElement)("option", { value: "604800" }, t("tempPinDuration7d"))
+        ),
+        (0, import_react2.createElement)("input", {
+          style: { flex: 1, minWidth: 120, height: 30, padding: "0 10px", borderRadius: 8, border: "1px solid var(--dsw-alias-border-l2,#d1d5db)", fontSize: 13, outline: "none" },
+          placeholder: t("tempPinLabelPh"),
+          value: tempPinForm.label,
+          onChange: (e) => setTempPinForm((f) => ({ ...f, label: e.target.value })),
+          onKeyDown: (e) => {
+            if (e.key === "Enter") createTempPinNow();
+          }
+        }),
+        (0, import_react2.createElement)("button", { style: { ...styles.btn, height: 30 }, onClick: createTempPinNow, disabled: tempPinBusy }, t("tempPinCreate"))
+      ),
+      // 错误展示
+      tempPinError ? (0, import_react2.createElement)("div", { style: { color: "var(--dsw-alias-state-error-primary,#dc2626)", fontSize: 12, marginTop: 6 } }, errText(tempPinError)) : null,
+      // 刚生成的那一个（高亮，下一秒会消失提示用户立刻复制）
+      tempPinLast ? (0, import_react2.createElement)(
+        "div",
+        { style: { marginTop: 10, padding: "8px 10px", borderRadius: 8, background: "var(--dsw-alias-bg-layer-2,#f3f4f6)", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, flexWrap: "wrap" } },
+        (0, import_react2.createElement)(
+          "div",
+          null,
+          (0, import_react2.createElement)("div", { style: { fontSize: 11, color: "var(--dsw-alias-state-success-primary,#16a34a)", fontWeight: 600, marginBottom: 2 } }, `${t("tempPinCreated")} \xB7 ${tempPinLast.kind === "public" ? t("tempPinKindPublic") : t("tempPinKindLan")} \xB7 ${formatRemaining(tempPinLast.expiresAt)}`),
+          (0, import_react2.createElement)("span", { style: { fontFamily: "ui-monospace,Menlo,monospace", fontSize: 16, letterSpacing: 2, fontWeight: 600 } }, tempPinLast.value)
+        ),
+        (0, import_react2.createElement)("button", { style: { ...styles.btn, height: 28, padding: "0 12px", fontSize: 12 }, onClick: () => copyTempPin(tempPinLast.value) }, t("tempPinCopy"))
+      ) : null,
+      // 列表
+      (0, import_react2.createElement)(
+        "div",
+        { style: { marginTop: 12, borderTop: "1px solid var(--dsw-alias-border-l2,#e5e7eb)", paddingTop: 8 } },
+        tempPinsList.length === 0 ? (0, import_react2.createElement)("div", { style: { ...styles.muted, padding: "6px 0" } }, t("tempPinEmpty")) : tempPinsList.map((p) => (0, import_react2.createElement)(
+          "div",
+          { key: p.value, style: { display: "flex", alignItems: "center", gap: 8, padding: "6px 0", borderBottom: "1px solid var(--dsw-alias-border-l2,#e5e7eb)" } },
+          (0, import_react2.createElement)("span", { style: { fontSize: 11, color: "var(--dsw-alias-label-tertiary,#8b93a1)", minWidth: 50 } }, p.kind === "public" ? t("tempPinKindPublic") : t("tempPinKindLan")),
+          (0, import_react2.createElement)("span", { style: { fontFamily: "ui-monospace,Menlo,monospace", fontSize: 13, letterSpacing: 1, flexShrink: 0 } }, p.value),
+          (0, import_react2.createElement)("span", { style: { ...styles.muted, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, p.label || "\u2014"),
+          (0, import_react2.createElement)("span", { style: { fontSize: 11, color: "var(--dsw-alias-label-tertiary,#8b93a1)" } }, `${t("tempPinExpiresIn")} ${formatRemaining(p.expiresAt)}`),
+          (0, import_react2.createElement)("button", { style: { ...styles.btn, height: 24, padding: "0 10px", fontSize: 11 }, onClick: () => revokeTempPinNow(p) }, t("tempPinRevoke"))
+        ))
+      )
+    ),
     // 恢复出厂设置：设置出问题时的临时兜底（最底部，避免误触）
     (0, import_react2.createElement)(
       "div",

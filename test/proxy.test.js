@@ -665,6 +665,63 @@ test('访问令牌按 Host 区分（issue #24）：局域网开关关闭 → 免
   }
 });
 
+test('临时 PIN（issue #69）：getAltTokens 提供的临时 PIN 与主 PIN 任一命中即放行', async () => {
+  const http = await import('node:http');
+  const MAIN = 'main1234';
+  const TEMP = 'temp5678';
+  const SK = 'sess-key';
+  const up = createServer((req, res) => {
+    res.writeHead(200, { 'content-type': 'text/html' });
+    res.end('<html>ok</html>');
+  });
+  await new Promise((r) => up.listen(0, '127.0.0.1', r));
+  const proxy = await createPocketProxy({
+    port: 0, host: '127.0.0.1',
+    upstream: { host: '127.0.0.1', port: up.address().port },
+    auth: {
+      getToken: () => MAIN,
+      getAltTokens: () => [TEMP],
+      isProtected: () => true,
+      sessionKey: SK,
+    },
+  });
+  const crypto = await import('node:crypto');
+  const cookieFor = (tok) => crypto.createHash('sha256').update(`${tok}:${SK}`).digest('hex');
+  const raw = (headers) => new Promise((resolve, reject) => {
+    const req = http.request({ host: '127.0.0.1', port: proxy.port, path: '/', headers }, (res) => {
+      const chunks = [];
+      res.on('data', (c) => chunks.push(c));
+      res.on('end', () => resolve({ status: res.statusCode }));
+      res.on('error', reject);
+    });
+    req.on('error', reject);
+    req.end();
+  });
+  try {
+    // 1) 主 PIN cookie
+    assert.equal((await raw({ Host: 'x:3081', Accept: 'text/html', Cookie: `dsh_pocket_token=${cookieFor(MAIN)}` })).status, 200);
+    // 2) 临时 PIN cookie
+    assert.equal((await raw({ Host: 'x:3081', Accept: 'text/html', Cookie: `dsh_pocket_token=${cookieFor(TEMP)}` })).status, 200, '临时 PIN 单独放行');
+    // 3) URL ?token= 临时 PIN
+    assert.equal((await raw({ Host: 'x:3081', Accept: 'text/html' })).status, 200); // no auth
+    // 4) 无 cookie → 登录页（不放行）
+    const noAuth = await new Promise((resolve, reject) => {
+      const req = http.request({ host: '127.0.0.1', port: proxy.port, path: '/', headers: { Host: 'x:3081', Accept: 'text/html' } }, (res) => {
+        const chunks = [];
+        res.on('data', (c) => chunks.push(c));
+        res.on('end', () => resolve({ status: res.statusCode, body: Buffer.concat(chunks).toString('utf8') }));
+      });
+      req.on('error', reject);
+      req.end();
+    });
+    assert.equal(noAuth.status, 200, '无 cookie 仍返回 200 登录页');
+    assert.ok(noAuth.body.includes('访问密码'), '无 cookie 看到登录页');
+  } finally {
+    await proxy.close();
+    await new Promise((r) => up.close(r));
+  }
+});
+
 test('局域网访问总开关：关闭后拦截局域网 Host（403 提示页），loopback 与公网放行', async () => {
   const http = await import('node:http');
   const up = createServer((req, res) => {

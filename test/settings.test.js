@@ -1,7 +1,7 @@
 // 局域网访问密码开关（issue #24）：默认开启、持久化、可关可开
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, rmSync, existsSync, readFileSync, statSync } from 'node:fs';
+import { mkdtempSync, rmSync, existsSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -195,4 +195,57 @@ test('代理端口（issue #70）：默认 0（用 3081）；持久化、清除'
   assert.equal(setProxyPort(-1), 0, '负数清除');
   assert.equal(setProxyPort(1.5), 0, '小数清除');
   assert.equal(setProxyPort(80), 80, '合法端口生效');
+}));
+
+test('临时 PIN（issue #69）：生成、列出去过期、撤销、host 分类', async () => withHome(async () => {
+  const settings = await import('../lib/settings.mjs');
+  // 初始为空
+  assert.deepEqual(settings.tempPins(), [], '无配置返回空');
+  assert.deepEqual(settings.tempPinValuesFor('public'), [], '公网空');
+  assert.deepEqual(settings.tempPinValuesFor('lan'), [], '局域网空');
+
+  // 生成公网 1 小时
+  const pub = settings.createTempPin({ kind: 'public', expiresInSec: 3600, label: '朋友 A' });
+  assert.equal(pub.kind, 'public');
+  assert.match(pub.value, /^[a-zA-Z0-9]{8}$/, '8 位字母数字');
+  assert.equal(pub.label, '朋友 A');
+  assert.ok(pub.expiresAt > Date.now() + 3500_000 && pub.expiresAt < Date.now() + 3700_000, '过期时间 ≈ now+1h');
+
+  // 局域网临时 PIN
+  const lan = settings.createTempPin({ kind: 'lan', expiresInSec: 600, label: '同事临时' });
+  assert.equal(lan.kind, 'lan');
+
+  // 列出（按 host 分类）
+  const pubList = settings.tempPinValuesFor('public');
+  const lanList = settings.tempPinValuesFor('lan');
+  assert.deepEqual(pubList, [pub.value], '公网列表只含公网临时 PIN');
+  assert.deepEqual(lanList, [lan.value], '局域网列表只含局域网临时 PIN');
+
+  // 全部列出
+  const all = settings.tempPins();
+  assert.equal(all.length, 2, '共 2 个未过期');
+
+  // 非法 kind 抛错
+  assert.throws(() => settings.createTempPin({ kind: 'wrong', expiresInSec: 600 }), /public 或 lan/);
+  // 非法 expiresInSec
+  assert.throws(() => settings.createTempPin({ kind: 'public', expiresInSec: 60 }), /有效期/);
+  assert.throws(() => settings.createTempPin({ kind: 'public', expiresInSec: 60 * 60 * 24 * 31 }), /有效期/);
+  assert.throws(() => settings.createTempPin({ kind: 'public', expiresInSec: 'abc' }), /有效期/);
+
+  // 撤销
+  assert.equal(settings.revokeTempPin(pub.value, 'public'), true, '撤销公网临时 PIN 成功');
+  assert.deepEqual(settings.tempPins(), [lan], '撤销后只剩局域网');
+  assert.equal(settings.revokeTempPin(pub.value, 'public'), false, '重复撤销返回 false');
+  assert.equal(settings.revokeTempPin('notapin', 'lan'), false, '非法值返回 false');
+
+  // 过期懒清理：手动塞一个过期的到 settings.json
+  const sp = settings.settingsPath();
+  const raw = JSON.parse(readFileSync(sp, 'utf8'));
+  raw.tempPins.push({ value: 'expired1', kind: 'lan', expiresAt: Date.now() - 1000, label: '已过期' });
+  writeFileSync(sp, JSON.stringify(raw));
+  assert.deepEqual(settings.tempPins(), [lan], '过期项被过滤、不写盘');
+  // 重新生成触发写盘 → 过期项被清掉
+  settings.createTempPin({ kind: 'lan', expiresInSec: 300 });
+  const after = JSON.parse(readFileSync(sp, 'utf8'));
+  assert.equal(after.tempPins.find((p) => p.value === 'expired1'), undefined, '过期项在写盘时已清掉');
 }));
