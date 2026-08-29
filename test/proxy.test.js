@@ -365,7 +365,19 @@ test('WS upgrade 遇非 101 响应：客户端拿到状态行，不悬挂', asyn
   }
 });
 
-test('desktopEnvPatchScript：注入 dsh-desktop-mode/platform 参数补丁（issue #3/#4）', async () => {
+test('issue #76 回归：插件不再注入 dsh-desktop-* 标记（否则桌面端 2.0.3 会报「打开恢复模式」/403）', async () => {
+  const { readFileSync } = await import('node:fs');
+  const src = readFileSync(new URL('../lib/index.js', import.meta.url), 'utf8');
+  // lib/index.js 组装 injectHtml 的地方不能再出现 desktopEnvPatchScript
+  assert.ok(!/desktopEnvPatchScript\s*\(/.test(src), 'index.js 已不再注入桌面参数补丁');
+  // 注入内容本身也不允许带 dsh-desktop- 前缀的标记
+  const { DEFAULT_INJECT, advancedNoticeScript, desktopEnvPatchScript } = await import('../lib/proxy.mjs');
+  const injected = DEFAULT_INJECT + advancedNoticeScript();
+  assert.ok(!injected.includes('dsh-desktop-'), '默认注入内容不含桌面标记');
+  assert.ok(desktopEnvPatchScript('win32').includes('dsh-desktop-mode'), '废弃的补丁函数本身仍保留（仅供旧版兼容）');
+});
+
+test('desktopEnvPatchScript：注入 dsh-desktop-mode/platform 参数补丁（issue #3/#4，已废弃见 issue #76）', async () => {
   const { desktopEnvPatchScript, DEFAULT_INJECT } = await import('../lib/proxy.mjs');
   const patch = desktopEnvPatchScript('darwin');
   assert.ok(patch.includes("dsh-desktop-mode"), '补 mode 参数');
