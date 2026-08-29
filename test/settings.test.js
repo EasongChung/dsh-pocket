@@ -82,20 +82,24 @@ test('PIN 自定义标记（issue #33）：默认 false，设置/清除持久化
   assert.equal(pinCustom('lan'), false, '互不影响');
 }));
 
-test('setCustomPin / rotateAccessToken（issue #33）：8 位数字自定义 + 自定义后公网不轮换；非法输入抛错', () => withHome(async () => {
+test('setCustomPin / rotateAccessToken（issue #33）：8 位字母数字自定义 + 自定义后公网不轮换；非法输入抛错', () => withHome(async () => {
   const { setCustomPin, rotateAccessToken, getAccessToken } = await import('../lib/index.js');
   const { pinCustom } = await import('../lib/settings.mjs');
   // 非法输入
-  assert.throws(() => setCustomPin('public', '123'), /8 位数字/, '太短拒绝');
-  assert.throws(() => setCustomPin('public', 'abcdefgh'), /8 位数字/, '非数字拒绝');
+  assert.throws(() => setCustomPin('public', '123'), /8 位英文字母或数字/, '太短拒绝');
+  assert.throws(() => setCustomPin('public', 'abc$ef12'), /8 位英文字母或数字/, '特殊符号拒绝');
+  assert.throws(() => setCustomPin('public', '123456789'), /8 位英文字母或数字/, '超长拒绝');
   assert.throws(() => setCustomPin('other', '12345678'), /未知/, '未知类型拒绝');
-  // 合法自定义：公网
-  assert.equal(setCustomPin('public', '88886666'), '88886666', '公网自定义成功');
+  // 合法自定义：公网（纯数字）
+  assert.equal(setCustomPin('public', '88886666'), '88886666', '公网自定义成功（纯数字）');
   assert.equal(pinCustom('public'), true, '公网标记自定义');
   assert.equal(getAccessToken(), '88886666', '值已写入');
   // 自定义后 rotateAccessToken 不轮换（值保持）
   assert.equal(rotateAccessToken(), '88886666', '自定义后开启公网不换新');
   assert.equal(getAccessToken(), '88886666', '值未被覆盖');
+  // 合法自定义：公网（字母 + 数字混合，大小写均可）
+  assert.equal(setCustomPin('public', 'aB3xY9k2'), 'aB3xY9k2', '公网自定义成功（字母数字混合）');
+  assert.equal(getAccessToken(), 'aB3xY9k2', '混合密码已写入');
   // 合法自定义：局域网
   assert.equal(setCustomPin('lan', '77775555'), '77775555', '局域网自定义成功');
   assert.equal(pinCustom('lan'), true, '局域网标记自定义');
