@@ -1770,7 +1770,7 @@ function PocketSettingsTab({ rpcCall, t }) {
     }),
     (0, import_react2.createElement)("button", { style: { ...styles.btn, height: 26, padding: "0 10px", fontSize: 12, marginLeft: 2 }, onClick: () => saveCustomPin(which) }, t("save")),
     (0, import_react2.createElement)("button", { style: { ...styles.btn, height: 26, padding: "0 10px", fontSize: 12 }, onClick: () => setCustomPin(null) }, t("cancel")),
-    customPin?.err ? (0, import_react2.createElement)("div", { style: { color: "var(--dsw-alias-state-error-primary,#dc2626)", marginTop: 4 } }, customPin.err) : null
+    customPin?.err ? (0, import_react2.createElement)("div", { style: { color: "var(--dsw-alias-state-error-primary,#dc2626)", marginTop: 4 } }, errText(customPin.err)) : null
   );
   const customBtn = (which) => (0, import_react2.createElement)("button", { style: { ...styles.btn, height: 26, padding: "0 10px", fontSize: 12, marginLeft: 8 }, onClick: () => setCustomPin({ which, value: "", err: null }) }, t("customize"));
   const lanUrl = status?.lanUrl;
@@ -1782,6 +1782,12 @@ function PocketSettingsTab({ rpcCall, t }) {
   const tunnelModeView = status?.tunnelConfig ?? { mode: "quick", hostname: "", tokenSet: false };
   const namedMode = tunnelModeView.mode === "named";
   const namedActive = namedMode || tunnelCfg !== null;
+  const errText = (msg) => {
+    const s = String(msg ?? "");
+    const i = s.indexOf(" | ");
+    if (i < 0) return s;
+    return (t("ok") === zh2.ok ? s.slice(0, i) : s.slice(i + 3)).trim();
+  };
   const modeBtnStyle = (active) => ({
     ...styles.btn,
     height: 28,
@@ -1871,7 +1877,7 @@ function PocketSettingsTab({ rpcCall, t }) {
       (0, import_react2.createElement)(
         "div",
         { style: styles.muted, marginTop: 4 },
-        updateInfo.updating ? fmt(t, "updatingDetail", { s: elapsed(updateInfo.startedAt) }) : updateInfo.restarting ? fmt(t, "restartingDetail", { s: elapsed(updateInfo.startedAt) }) : updateInfo.result === "ok" ? updateInfo.autoRestart ? t("updatedAutoDetail") : t("updatedRestartDetail") : updateInfo.result === "fail" ? fmt(t, "updateFailed", { err: updateInfo.output || t("unknownError") }) : fmt(t, "versionRange", { cur: updateInfo.current, latest: updateInfo.latest })
+        updateInfo.updating ? fmt(t, "updatingDetail", { s: elapsed(updateInfo.startedAt) }) : updateInfo.restarting ? fmt(t, "restartingDetail", { s: elapsed(updateInfo.startedAt) }) : updateInfo.result === "ok" ? updateInfo.autoRestart ? t("updatedAutoDetail") : t("updatedRestartDetail") : updateInfo.result === "fail" ? fmt(t, "updateFailed", { err: errText(updateInfo.output) || t("unknownError") }) : fmt(t, "versionRange", { cur: updateInfo.current, latest: updateInfo.latest })
       )
     ) : null,
     // 局域网：标题行自带总开关 → 二维码+地址 → 设置行（访问密码 / 高级·手动选地址）
@@ -1948,7 +1954,7 @@ function PocketSettingsTab({ rpcCall, t }) {
       ) : tunnelPhase === "error" ? (0, import_react2.createElement)(
         "div",
         { style: { marginTop: 8, fontSize: 12, color: "var(--dsw-alias-state-error-primary,#dc2626)" } },
-        fmt(t, "error", { detail: tunnelStateDetail || t("unknownError") })
+        fmt(t, "error", { detail: errText(tunnelStateDetail) || t("unknownError") })
       ) : !tunnelUrl && !isDesktop ? (0, import_react2.createElement)("div", { style: { ...styles.muted, marginTop: 8 } }, t("wanOffHint")) : null,
       tunnelUrl ? (0, import_react2.createElement)(
         "div",
@@ -2020,7 +2026,7 @@ function PocketSettingsTab({ rpcCall, t }) {
               ),
               (0, import_react2.createElement)("div", { style: { ...styles.muted, marginTop: 6 } }, t("namedHow")),
               (0, import_react2.createElement)("div", { style: { marginTop: 2, fontSize: 11, color: "var(--dsw-alias-state-warn-primary,#b45309)", lineHeight: 1.5 } }, t("namedSecurity")),
-              tunnelCfg.err ? (0, import_react2.createElement)("div", { style: { color: "var(--dsw-alias-state-error-primary,#dc2626)", marginTop: 4 } }, tunnelCfg.err) : null
+              tunnelCfg.err ? (0, import_react2.createElement)("div", { style: { color: "var(--dsw-alias-state-error-primary,#dc2626)", marginTop: 4 } }, errText(tunnelCfg.err)) : null
             ) : null
           )
         ),
@@ -2043,7 +2049,7 @@ function PocketSettingsTab({ rpcCall, t }) {
         ) : null
       ) : null
     ),
-    error ? (0, import_react2.createElement)("div", { style: { color: "var(--dsw-alias-state-error-primary,#dc2626)", fontSize: 12, marginTop: 8 } }, `\u274C ${error}`) : null,
+    error ? (0, import_react2.createElement)("div", { style: { color: "var(--dsw-alias-state-error-primary,#dc2626)", fontSize: 12, marginTop: 8 } }, `\u274C ${errText(error)}`) : null,
     // 局域网访问开关确认弹框（关闭/打开时弹窗提醒）
     lanToggleOpen !== null ? (0, import_react2.createElement)(
       "div",

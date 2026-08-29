@@ -293,7 +293,7 @@ function PocketSettingsTab({ rpcCall, t }) {
     }),
     h('button', { style: { ...styles.btn, height: 26, padding: '0 10px', fontSize: 12, marginLeft: 2 }, onClick: () => saveCustomPin(which) }, t('save')),
     h('button', { style: { ...styles.btn, height: 26, padding: '0 10px', fontSize: 12 }, onClick: () => setCustomPin(null) }, t('cancel')),
-    customPin?.err ? h('div', { style: { color: 'var(--dsw-alias-state-error-primary,#dc2626)', marginTop: 4 } }, customPin.err) : null,
+    customPin?.err ? h('div', { style: { color: 'var(--dsw-alias-state-error-primary,#dc2626)', marginTop: 4 } }, errText(customPin.err)) : null,
   );
   // 「自定义」按钮（非输入态显示在密码行末尾）
   const customBtn = (which) => h('button', { style: { ...styles.btn, height: 26, padding: '0 10px', fontSize: 12, marginLeft: 8 }, onClick: () => setCustomPin({ which, value: '', err: null }) }, t('customize'));
@@ -309,6 +309,13 @@ function PocketSettingsTab({ rpcCall, t }) {
   const namedMode = tunnelModeView.mode === 'named';
   // 模式按钮选中态高亮：固定域名模式本身，或正在编辑固定域名配置，都视为「选中」
   const namedActive = namedMode || tunnelCfg !== null;
+  // 后端错误消息统一为「中文 | English」混排；按当前界面语言只显示对应一半
+  const errText = (msg) => {
+    const s = String(msg ?? '');
+    const i = s.indexOf(' | ');
+    if (i < 0) return s;
+    return (t('ok') === POCKET_ZH.ok ? s.slice(0, i) : s.slice(i + 3)).trim();
+  };
   const modeBtnStyle = (active) => ({
     ...styles.btn, height: 28, padding: '0 12px', fontSize: 12,
     fontWeight: active ? 600 : 400,
@@ -382,7 +389,7 @@ function PocketSettingsTab({ rpcCall, t }) {
         : updateInfo.result === 'ok'
           ? (updateInfo.autoRestart ? t('updatedAutoDetail')
             : t('updatedRestartDetail'))
-        : updateInfo.result === 'fail' ? fmt(t, 'updateFailed', { err: updateInfo.output || t('unknownError') })
+        : updateInfo.result === 'fail' ? fmt(t, 'updateFailed', { err: errText(updateInfo.output) || t('unknownError') })
         : fmt(t, 'versionRange', { cur: updateInfo.current, latest: updateInfo.latest })),
     ) : null,
 
@@ -445,7 +452,7 @@ function PocketSettingsTab({ rpcCall, t }) {
             : fmt(t, 'connecting', { s: elapsed(tunnelStateStarted), suffix: elapsed(tunnelStateStarted) > 30 ? t('slowHint') : '' }))
         : tunnelPhase === 'error'
           ? h('div', { style: { marginTop: 8, fontSize: 12, color: 'var(--dsw-alias-state-error-primary,#dc2626)' } },
-            fmt(t, 'error', { detail: tunnelStateDetail || t('unknownError') }))
+            fmt(t, 'error', { detail: errText(tunnelStateDetail) || t('unknownError') }))
           : (!tunnelUrl && !isDesktop ? h('div', { style: { ...styles.muted, marginTop: 8 } }, t('wanOffHint')) : null),
       tunnelUrl
         ? h('div', null,
@@ -495,7 +502,7 @@ function PocketSettingsTab({ rpcCall, t }) {
                 ),
                 h('div', { style: { ...styles.muted, marginTop: 6 } }, t('namedHow')),
                 h('div', { style: { marginTop: 2, fontSize: 11, color: 'var(--dsw-alias-state-warn-primary,#b45309)', lineHeight: 1.5 } }, t('namedSecurity')),
-                tunnelCfg.err ? h('div', { style: { color: 'var(--dsw-alias-state-error-primary,#dc2626)', marginTop: 4 } }, tunnelCfg.err) : null,
+                tunnelCfg.err ? h('div', { style: { color: 'var(--dsw-alias-state-error-primary,#dc2626)', marginTop: 4 } }, errText(tunnelCfg.err)) : null,
               ) : null,
             ),
           ),
@@ -516,7 +523,7 @@ function PocketSettingsTab({ rpcCall, t }) {
         : null,
     ),
 
-    error ? h('div', { style: { color: 'var(--dsw-alias-state-error-primary,#dc2626)', fontSize: 12, marginTop: 8 } }, `❌ ${error}`) : null,
+    error ? h('div', { style: { color: 'var(--dsw-alias-state-error-primary,#dc2626)', fontSize: 12, marginTop: 8 } }, `❌ ${errText(error)}`) : null,
 
     // 局域网访问开关确认弹框（关闭/打开时弹窗提醒）
     lanToggleOpen !== null ? h('div', { style: { position: 'fixed', inset: 0, zIndex: 10000, background: 'rgba(0,0,0,.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 } },
