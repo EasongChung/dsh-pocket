@@ -6,6 +6,7 @@ import { MobileDrawerFooter } from './MobileDrawerFooter.tsx'
 import { MOBILE_CSS } from './mobile.css.ts'
 import { NS, en, zh } from './locales.ts'
 import type { MobileNavKey } from './locales.ts'
+import { resolveLayout, persistLayoutFromUrl } from './layout-mode.mjs'
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
   interface LocaleNamespaceMap {
@@ -23,6 +24,22 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
  * @param ctx - client root context.
  */
 export function mobileApply(ctx): void {
+  // 布局模式（issue #74）：URL 参数 > localStorage > auto(=matchMedia)。
+  // desktop 模式（宽屏手机/平板强制电脑布局）下整段 mobile 效果都不挂——
+  // 不加 styles、不挂 slots、不跑 effects，直接走 DSH 原生桌面 UI。
+  const urlValue = new URL(window.location.href).searchParams.get('dsh-layout') ?? '';
+  const narrowMQ = window.matchMedia('(max-width: 1023px)');
+  const stored = persistLayoutFromUrl(urlValue);
+  const layout = resolveLayout({ urlValue, stored, narrowMatch: narrowMQ.matches });
+  document.body?.setAttribute('data-dsh-pocket-layout', layout);
+  if (layout === 'desktop') return;
+  // 强制 mobile：narrow 永远 true；宽度变化不再切换（用户已显式选 mobile）
+  // auto 模式：narrow 是真实的 matchMedia，宽度变化会触发 effect 挂载/卸载
+  let narrow: MediaQueryList = narrowMQ;
+  if (layout === 'mobile') {
+    narrow = { matches: true, addEventListener: () => {}, removeEventListener: () => {} } as MediaQueryList;
+  }
+
   ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'dsh-mobile-nav: dictionaries')
 
   ctx.effect(() => {
@@ -52,7 +69,6 @@ export function mobileApply(ctx): void {
   //   zoom; modern browsers are covered by the stylesheet's
   //   touch-action: manipulation (which keeps pan and pinch zoom).
   ctx.effect(() => {
-    const narrow = window.matchMedia('(max-width: 1023px)')
     const viewport = document.querySelector<HTMLMetaElement>('meta[name="viewport"]')
     const originalViewport = viewport?.content ?? ''
     const themeMeta = document.createElement('meta')
@@ -96,7 +112,6 @@ export function mobileApply(ctx): void {
   // sheet's own collapse chevron is tapped, so closing is symmetric with
   // opening.
   ctx.effect(() => {
-    const narrow = window.matchMedia('(max-width: 1023px)')
     if (!narrow.matches) return () => {}
     const onChevronClick = (event: MouseEvent) => {
       const target = event.target as HTMLElement | null
@@ -115,7 +130,6 @@ export function mobileApply(ctx): void {
   // `data-mobile-nav-explorer="1|0"` so the stylesheet can hide the entries
   // on hosts without it (dsh-web-ui installs keep the feature).
   ctx.effect(() => {
-    const narrow = window.matchMedia('(max-width: 1023px)')
     if (!narrow.matches) return () => {}
     const frame = (): HTMLElement | null => document.querySelector('[data-mobile-nav="frame"]')
     const check = () => {
@@ -141,7 +155,6 @@ export function mobileApply(ctx): void {
   // whenever the suite hides the column again (collapse chevron / tab
   // close), so a restored-but-unwanted sheet never appears.
   ctx.effect(() => {
-    const narrow = window.matchMedia('(max-width: 1023px)')
     if (!narrow.matches) return () => {}
     const frame = (): HTMLElement | null => document.querySelector('[data-mobile-nav="frame"]')
     const onTap = (event: MouseEvent) => {
@@ -173,7 +186,6 @@ export function mobileApply(ctx): void {
   // marked row out as ONE horizontally scrolling line with every metric
   // reachable.
   ctx.effect(() => {
-    const narrow = window.matchMedia('(max-width: 1023px)')
     if (!narrow.matches) return () => {}
     // The composer root renders the TPS readout ("TPS 89.4 tok/s") as its
     // own row BELOW the status strip; fold it into the strip so every
@@ -218,7 +230,6 @@ export function mobileApply(ctx): void {
   // with the Web Animations API each time a column turns visible, then
   // leave the resting state to the stylesheet.
   ctx.effect(() => {
-    const narrow = window.matchMedia('(max-width: 1023px)')
     if (!narrow.matches) return () => {}
     const cols = ['[data-aionui-explorer-col]', '[data-aionui-preview-col]']
     const seen = new Map<string, boolean>()

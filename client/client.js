@@ -1231,8 +1231,44 @@ var en = {
   "files": "Files"
 };
 
+// client/mobile/layout-mode.mjs
+function resolveLayout({ urlValue, stored, narrowMatch }) {
+  const url = String(urlValue ?? "").trim();
+  if (url === "desktop") return "desktop";
+  if (url === "mobile") return "mobile";
+  if (stored === "desktop" || stored === "mobile") return stored;
+  return narrowMatch ? "mobile" : "desktop";
+}
+function persistLayoutFromUrl(urlValue) {
+  if (typeof localStorage === "undefined") return "";
+  const v = String(urlValue ?? "").trim();
+  try {
+    if (v === "desktop" || v === "mobile") localStorage.setItem("dsh-pocket.layout", v);
+    else if (v === "auto" || v === "") localStorage.removeItem("dsh-pocket.layout");
+  } catch {
+  }
+  try {
+    const s = localStorage.getItem("dsh-pocket.layout");
+    return s === "desktop" || s === "mobile" ? s : "";
+  } catch {
+    return "";
+  }
+}
+
 // client/mobile/mobile-apply.tsx
 function mobileApply(ctx) {
+  const urlValue = new URL(window.location.href).searchParams.get("dsh-layout") ?? "";
+  const narrowMQ = window.matchMedia("(max-width: 1023px)");
+  const stored = persistLayoutFromUrl(urlValue);
+  const layout = resolveLayout({ urlValue, stored, narrowMatch: narrowMQ.matches });
+  document.body?.setAttribute("data-dsh-pocket-layout", layout);
+  if (layout === "desktop") return;
+  let narrow = narrowMQ;
+  if (layout === "mobile") {
+    narrow = { matches: true, addEventListener: () => {
+    }, removeEventListener: () => {
+    } };
+  }
   ctx.effect(() => ctx.locale.register(NS, { zh, en }), "dsh-mobile-nav: dictionaries");
   ctx.effect(() => {
     const tag = document.createElement("style");
@@ -1245,7 +1281,6 @@ function mobileApply(ctx) {
     };
   }, "dsh-mobile-nav: styles");
   ctx.effect(() => {
-    const narrow = window.matchMedia("(max-width: 1023px)");
     const viewport = document.querySelector('meta[name="viewport"]');
     const originalViewport = viewport?.content ?? "";
     const themeMeta = document.createElement("meta");
@@ -1277,7 +1312,6 @@ function mobileApply(ctx) {
     };
   }, "dsh-mobile-nav: status bar theme + viewport + zoom guard");
   ctx.effect(() => {
-    const narrow = window.matchMedia("(max-width: 1023px)");
     if (!narrow.matches) return () => {
     };
     const onChevronClick = (event) => {
@@ -1289,7 +1323,6 @@ function mobileApply(ctx) {
     return () => document.removeEventListener("click", onChevronClick, true);
   }, "dsh-mobile-nav: aionui explorer close marker");
   ctx.effect(() => {
-    const narrow = window.matchMedia("(max-width: 1023px)");
     if (!narrow.matches) return () => {
     };
     const frame = () => document.querySelector('[data-mobile-nav="frame"]');
@@ -1307,7 +1340,6 @@ function mobileApply(ctx) {
     };
   }, "dsh-mobile-nav: explorer availability (issue #48)");
   ctx.effect(() => {
-    const narrow = window.matchMedia("(max-width: 1023px)");
     if (!narrow.matches) return () => {
     };
     const frame = () => document.querySelector('[data-mobile-nav="frame"]');
@@ -1332,7 +1364,6 @@ function mobileApply(ctx) {
     };
   }, "dsh-mobile-nav: preview sheet open marker");
   ctx.effect(() => {
-    const narrow = window.matchMedia("(max-width: 1023px)");
     if (!narrow.matches) return () => {
     };
     const moveTps = (stats) => {
@@ -1366,7 +1397,6 @@ function mobileApply(ctx) {
     };
   }, "dsh-mobile-nav: stats line marker");
   ctx.effect(() => {
-    const narrow = window.matchMedia("(max-width: 1023px)");
     if (!narrow.matches) return () => {
     };
     const cols = ["[data-aionui-explorer-col]", "[data-aionui-preview-col]"];
