@@ -33,11 +33,6 @@ function looksLikeFilePath(text: string | null): boolean {
   return false
 }
 
-/** 节点是否落在 dsh-pocket 自身面板内（不拦截面板内的交互）。 */
-function isInsidePocket(el: Element | null): boolean {
-  return el !== null && el.closest('[data-mobile-nav="frame"]') !== null
-}
-
 /** 写剪贴板：优先 navigator.clipboard，非安全上下文（局域网 http）回退 execCommand。 */
 async function copyText(text: string): Promise<boolean> {
   try {
@@ -109,7 +104,7 @@ export function startFileGuard(
   // 因此只拦 click 即可同时覆盖鼠标与键盘，避免重复处理。
   const onClick = (event: MouseEvent): void => {
     const target = event.target as HTMLElement | null
-    if (target === null || isInsidePocket(target)) return
+    if (target === null) return
     const el = target.closest('button, a') as HTMLElement | null
     if (el === null) return
     if (!looksLikeFilePath(el.textContent)) return
@@ -128,7 +123,6 @@ export function startFileGuard(
       if (el.getAttribute('data-mobile-nav-copy') === '1') return
       const txt = (el.textContent ?? '').trim()
       if (!looksLikeFilePath(txt)) return
-      if (isInsidePocket(el)) return
       el.setAttribute('data-mobile-nav-copy', '1')
       const btn = document.createElement('button')
       btn.type = 'button'

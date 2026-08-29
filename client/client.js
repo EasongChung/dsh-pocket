@@ -352,9 +352,6 @@ function looksLikeFilePath(text) {
   if (/[\w.\-]+\/[\w.\-]+\.\w{1,12}/.test(t)) return true;
   return false;
 }
-function isInsidePocket(el) {
-  return el !== null && el.closest('[data-mobile-nav="frame"]') !== null;
-}
 async function copyText(text) {
   try {
     if (navigator.clipboard?.writeText) {
@@ -419,7 +416,7 @@ function startFileGuard(readFile) {
   };
   const onClick = (event) => {
     const target = event.target;
-    if (target === null || isInsidePocket(target)) return;
+    if (target === null) return;
     const el = target.closest("button, a");
     if (el === null) return;
     if (!looksLikeFilePath(el.textContent)) return;
@@ -434,7 +431,6 @@ function startFileGuard(readFile) {
       if (el.getAttribute("data-mobile-nav-copy") === "1") return;
       const txt = (el.textContent ?? "").trim();
       if (!looksLikeFilePath(txt)) return;
-      if (isInsidePocket(el)) return;
       el.setAttribute("data-mobile-nav-copy", "1");
       const btn = document.createElement("button");
       btn.type = "button";
