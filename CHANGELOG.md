@@ -1,3 +1,16 @@
+# [2.0.0](https://github.com/shaobeichen/dsh-pocket/compare/v1.16.1...v2.0.0) (2026-08-29)
+
+
+* feat!: redesign settings page layout into structured cards ([1b7d494](https://github.com/shaobeichen/dsh-pocket/commit/1b7d494554ed80eadd701c1e2574760ff130580c))
+
+
+### BREAKING CHANGES
+
+* the settings page DOM structure and locale keys changed
+(lanAddressHint removed; wanAccess/pinLabel/modeLabel/advAddress/
+wanOffHint added). Custom styles or scripts targeting the old settings
+DOM/keys need updating.
+
 ## [1.16.1](https://github.com/shaobeichen/dsh-pocket/compare/v1.16.0...v1.16.1) (2026-08-29)
 
 
