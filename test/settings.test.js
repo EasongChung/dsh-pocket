@@ -178,3 +178,21 @@ test('恢复出厂设置：清空全部设置 + 重设随机密码（开关回�
   assert.equal(settings.pinCustom('lan'), false, '局域网自定义标记已清除');
   assert.equal(getAccessToken(), after.accessToken, '读到的公网密码与返回一致');
 }));
+
+test('代理端口（issue #70）：默认 0（用 3081）；持久化、清除', async () => withHome(async () => {
+  const { proxyPort, setProxyPort, settingsPath } = await import('../lib/settings.mjs');
+  assert.equal(proxyPort(), 0, '无配置 = 0（让 lib/index.js 用 3081）');
+  assert.equal(setProxyPort(3082), 3082, '设置后立即返回新值');
+  assert.equal(proxyPort(), 3082, '重新读取仍生效');
+  const raw = JSON.parse(readFileSync(settingsPath(), 'utf8'));
+  assert.equal(raw.proxyPort, 3082, 'settings.json 字段正确');
+  // 清除
+  assert.equal(setProxyPort(0), 0, '传 0 清除');
+  assert.equal(proxyPort(), 0, '清除后回到默认');
+  // 非法值容忍
+  assert.equal(setProxyPort('garbage'), 0, '字符串非法值清除');
+  assert.equal(setProxyPort(70000), 0, '超出 65535 清除');
+  assert.equal(setProxyPort(-1), 0, '负数清除');
+  assert.equal(setProxyPort(1.5), 0, '小数清除');
+  assert.equal(setProxyPort(80), 80, '合法端口生效');
+}));
