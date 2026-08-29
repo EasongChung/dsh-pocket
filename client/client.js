@@ -337,84 +337,99 @@ function MobileDrawerFooter({ useSessions, downloadSessionLog, toggleSidebar, t 
   ));
 }
 
-// client/mobile/fileCopy.ts
-var BUTTON_ATTR = "data-mobile-nav";
-var BUTTON_VALUE = "copy-file";
-var MARKER = "data-mobile-nav-copy";
-async function copyText(text) {
-  try {
-    if (navigator.clipboard && window.isSecureContext) {
-      await navigator.clipboard.writeText(text);
-      return true;
+// client/mobile/fileGuard.ts
+var GUARD_MSG = "\u624B\u673A\u4E0A\u65E0\u6CD5\u76F4\u63A5\u6253\u5F00\u7535\u8111\u4E0A\u7684\u6587\u4EF6";
+var WS_LABELS = ["\u6DFB\u52A0\u5DE5\u4F5C\u533A", "\u6DFB\u52A0\u5DE5\u4F5C\u533A\u2026", "Add workspace", "Add workspace\u2026"];
+function looksLikeFilePath(text) {
+  const t = (text ?? "").trim();
+  if (t.length < 3 || t.length > 320) return false;
+  if (/^(\/|~\/|\.\.?\/|[A-Za-z]:\\)/.test(t)) return true;
+  if (/\/[\w.\-]+\.\w{1,12}$/.test(t)) return true;
+  if (/[\w.\-]+\/[\w.\-]+\.\w{1,12}/.test(t)) return true;
+  return false;
+}
+function isInsidePocket(el) {
+  return el !== null && el.closest('[data-mobile-nav="frame"]') !== null;
+}
+function startFileGuard() {
+  let toastEl = null;
+  let toastTimer = null;
+  const showToast = (text) => {
+    if (toastEl === null) {
+      toastEl = document.createElement("div");
+      toastEl.setAttribute("data-mobile-nav", "file-guard-toast");
+      Object.assign(toastEl.style, {
+        position: "fixed",
+        left: "50%",
+        bottom: "64px",
+        transform: "translateX(-50%)",
+        maxWidth: "84vw",
+        zIndex: "9999",
+        padding: "10px 14px",
+        borderRadius: "10px",
+        background: "rgba(20,22,28,.92)",
+        color: "#fff",
+        fontSize: "13px",
+        lineHeight: "1.4",
+        textAlign: "center",
+        fontFamily: "inherit",
+        boxShadow: "0 4px 16px rgba(0,0,0,.28)",
+        pointerEvents: "none",
+        opacity: "0",
+        transition: "opacity .18s ease"
+      });
+      document.body.appendChild(toastEl);
     }
-  } catch {
-  }
-  try {
-    const ta = document.createElement("textarea");
-    ta.value = text;
-    ta.setAttribute("readonly", "");
-    ta.style.position = "fixed";
-    ta.style.top = "0";
-    ta.style.left = "0";
-    ta.style.opacity = "0";
-    document.body.appendChild(ta);
-    ta.select();
-    const ok = document.execCommand("copy");
-    ta.remove();
-    return ok;
-  } catch {
-    return false;
-  }
-}
-function createCopyButton() {
-  const btn = document.createElement("button");
-  btn.type = "button";
-  btn.setAttribute(BUTTON_ATTR, BUTTON_VALUE);
-  btn.textContent = "\u590D\u5236";
-  btn.setAttribute("aria-label", "\u590D\u5236\u6587\u4EF6\u5185\u5BB9");
-  btn.addEventListener("click", async (event) => {
-    event.preventDefault();
-    event.stopPropagation();
-    const card = btn.parentElement;
-    const block = card?.querySelector("pre") ?? null;
-    const text = block?.textContent ?? "";
-    const ok = await copyText(text);
-    const prev = btn.textContent;
-    btn.textContent = ok ? "\u5DF2\u590D\u5236" : "\u590D\u5236\u5931\u8D25";
-    btn.setAttribute("data-copied", ok ? "1" : "0");
-    window.setTimeout(() => {
-      btn.textContent = prev;
-      btn.removeAttribute("data-copied");
-    }, 1500);
-  });
-  return btn;
-}
-function injectInto(card) {
-  if (card.hasAttribute(MARKER)) return;
-  card.setAttribute(MARKER, "1");
-  if (getComputedStyle(card).position === "static") card.style.position = "relative";
-  card.appendChild(createCopyButton());
-}
-function collectCodeBlocks(root) {
-  const out = [];
-  for (const pre of Array.from(root.querySelectorAll("pre"))) {
-    const card = pre.parentElement;
-    if (card === null) continue;
-    if (card.hasAttribute(MARKER)) continue;
-    if ((pre.textContent ?? "").trim().length < 1) continue;
-    out.push(card);
-  }
-  return out;
-}
-function startFileCopyInjection() {
-  const scan = () => {
-    for (const card of collectCodeBlocks(document)) injectInto(card);
+    toastEl.textContent = text;
+    requestAnimationFrame(() => {
+      if (toastEl !== null) toastEl.style.opacity = "1";
+    });
+    if (toastTimer !== null) window.clearTimeout(toastTimer);
+    toastTimer = window.setTimeout(() => {
+      if (toastEl !== null) toastEl.style.opacity = "0";
+    }, 2600);
   };
-  const observer = new MutationObserver(scan);
-  observer.observe(document.body, { childList: true, subtree: true });
-  scan();
+  const onClick = (event) => {
+    const target = event.target;
+    if (target === null || isInsidePocket(target)) return;
+    const el = target.closest("button, a");
+    if (el === null) return;
+    if (!looksLikeFilePath(el.textContent)) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    showToast(GUARD_MSG);
+  };
+  document.addEventListener("click", onClick, true);
+  const hideWsEntries = () => {
+    const checkOne = (node) => {
+      if (node.nodeType !== 1) return;
+      const el = node;
+      const txt = (el.getAttribute("aria-label") ?? el.textContent ?? "").trim();
+      if (WS_LABELS.includes(txt)) {
+        el.style.display = "none";
+        el.setAttribute("data-mobile-nav-hide", "add-workspace");
+      }
+    };
+    const sel = '[role="menuitem"],[role="option"],li,button,a';
+    document.querySelectorAll(sel).forEach(checkOne);
+    const observer = new MutationObserver((mutations) => {
+      for (const m of mutations) {
+        m.addedNodes.forEach((n) => {
+          if (n.nodeType !== 1) return;
+          checkOne(n);
+          n.querySelectorAll?.(sel).forEach(checkOne);
+        });
+      }
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
+    return () => observer.disconnect();
+  };
+  const disconnectWs = hideWsEntries();
   return () => {
-    observer.disconnect();
+    document.removeEventListener("click", onClick, true);
+    disconnectWs();
+    if (toastTimer !== null) window.clearTimeout(toastTimer);
+    toastEl?.remove();
   };
 }
 
@@ -1279,40 +1294,15 @@ var MOBILE_CSS = `
     gap: 0 !important;
   }
 
-  /* ---------- \u590D\u5236\u6587\u4EF6\u5185\u5BB9\u6309\u94AE\uFF08issue #17\uFF09 ----------
-     \u6302\u5728\u4EE3\u7801/\u6587\u4EF6\u5757\u5BB9\u5668\u53F3\u4E0A\u89D2\uFF08position:relative \u7531 JS \u5728\u6CE8\u5165\u65F6\u8865\u4E0A\uFF09\u3002
-     \u53EA\u5C4F\u5185\u53EF\u89C1\uFF1A\u684C\u9762\u7AEF DSH \u81EA\u5E26\u590D\u5236\uFF0C\u4E14\u672C effect \u53EA\u5728 narrow \u4E0B\u6302\u8F7D\uFF0C\u6309\u94AE
-     \u6839\u672C\u4E0D\u4F1A\u6CE8\u5165\uFF1B\u8FD9\u91CC\u518D\u515C\u5E95\u4E00\u5C42\uFF0C\u907F\u514D\u4EFB\u4F55\u9057\u6F0F\u3002 */
-  [data-mobile-nav="copy-file"] {
-    position: absolute !important;
-    top: 6px !important;
-    right: 6px !important;
-    z-index: 6 !important;
-    display: inline-flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    height: 26px !important;
-    padding: 0 10px !important;
-    border: 1px solid var(--dsw-alias-border-l1, rgba(0, 0, 0, .12)) !important;
-    border-radius: 8px !important;
-    background: var(--dsw-alias-bg-base, #ffffff) !important;
-    color: var(--dsw-alias-label-primary, inherit) !important;
-    font-family: inherit !important;
-    font-size: 12px !important;
-    line-height: 1 !important;
-    cursor: pointer !important;
-    -webkit-tap-highlight-color: transparent !important;
-    box-shadow: 0 1px 4px rgba(0, 0, 0, .14) !important;
-  }
-  [data-mobile-nav="copy-file"]:active {
-    background: var(--dsw-alias-interactive-bg-hover, rgba(0, 0, 0, .06)) !important;
-  }
-  [data-mobile-nav="copy-file"][data-copied="1"] {
-    color: var(--dsw-alias-state-success-primary, #1a9d54) !important;
-    border-color: var(--dsw-alias-state-success-primary, #1a9d54) !important;
-  }
-  [data-mobile-nav="copy-file"][data-copied="0"] {
-    color: var(--dsw-alias-state-danger-primary, #e5484d) !important;
+  /* ---------- \u9690\u85CF\u300C\u6DFB\u52A0\u5DE5\u4F5C\u533A\u300D\u5165\u53E3\uFF08\u624B\u673A\u4E0A\u914D\u5DE5\u4F5C\u533A\u65E0\u610F\u4E49\uFF0Cissue #17 \u4FEE\u6B63\uFF09 ----------
+     \u56FE\u6807\u6309\u94AE\u7684 aria-label \u968F\u8BED\u8A00\u53D8\u5316\uFF08zh\u300C\u6DFB\u52A0\u5DE5\u4F5C\u533A\u300D/ en\u300CAdd workspace\u300D\uFF09\uFF0C
+     \u4E24\u79CD\u90FD\u8986\u76D6\uFF1B\u4E0B\u62C9\u83DC\u5355\u91CC\u7684\u300C\u6DFB\u52A0\u5DE5\u4F5C\u533A\u2026\u300D\u9879\u7531 fileGuard.ts \u7684 MutationObserver
+     \u6309\u6587\u6848\u515C\u5E95\u9690\u85CF\uFF08CSS \u9009\u4E0D\u5230\u7EAF\u6587\u672C\u8282\u70B9\uFF09\u3002\u53EA\u5728\u7A84\u5C4F\u751F\u6548\u2014\u2014\u684C\u9762\u7AEF\u7167\u5E38\u4FDD\u7559\u3002 */
+  button[aria-label="\u6DFB\u52A0\u5DE5\u4F5C\u533A"],
+  button[aria-label="\u6DFB\u52A0\u5DE5\u4F5C\u533A\u2026"],
+  button[aria-label="Add workspace"],
+  button[aria-label="Add workspace\u2026"] {
+    display: none !important;
   }
 }
 
@@ -1548,8 +1538,8 @@ function mobileApply(ctx) {
   ctx.effect(() => {
     if (!narrow.matches) return () => {
     };
-    return startFileCopyInjection();
-  }, "dsh-mobile-nav: file copy button (issue #17)");
+    return startFileGuard();
+  }, "dsh-mobile-nav: file open guard + hide add-workspace (issue #17)");
   ctx.slots.inject("conversation.session.header.actions", () => ctx.slots.register({
     name: "conversation.session.header.actions",
     id: "mobile-nav-toggle",

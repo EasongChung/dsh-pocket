@@ -3,7 +3,7 @@ import type { ClientContext } from '@deepseek-ai/dsh-client-runtime/client'
 import { MobileNavToggle } from './MobileNavToggle.tsx'
 import { MobileNavOverlay } from './MobileNavOverlay.tsx'
 import { MobileDrawerFooter } from './MobileDrawerFooter.tsx'
-import { startFileCopyInjection } from './fileCopy.ts'
+import { startFileGuard } from './fileGuard.ts'
 import { MOBILE_CSS } from './mobile.css.ts'
 import { NS, en, zh } from './locales.ts'
 import type { MobileNavKey } from './locales.ts'
@@ -263,13 +263,14 @@ export function mobileApply(ctx): void {
     }
   }, 'dsh-mobile-nav: sheet rise animation replay')
 
-  // 复制文件内容按钮（issue #17）：dsh-web 在手机上没有可用的下载入口，于是在
-  // 会话里的代码/文件块右上角注入一个「复制」按钮，把块内文本（文件内容）写
-  // 入剪贴板。只挂窄屏——桌面端 DSH 自带复制，不需要。
+  // 移动端文件守卫（issue #17 修正）：手机上点 dsh-web 渲染的文件链接会触发桌面
+  // 端 workspaces.openPath(open ...) —— 既打不开（路径在电脑上），又会抛
+  // "path open failed"。这里在捕获阶段拦截这类点击 / 键盘激活，改为弹一个提示，
+  // 并隐藏「添加工作区」入口（手机上配工作区无意义）。只挂窄屏。
   ctx.effect(() => {
     if (!narrow.matches) return () => {}
-    return startFileCopyInjection()
-  }, 'dsh-mobile-nav: file copy button (issue #17)')
+    return startFileGuard()
+  }, 'dsh-mobile-nav: file open guard + hide add-workspace (issue #17)')
 
   ctx.slots.inject('conversation.session.header.actions', () => ctx.slots.register({
     name: 'conversation.session.header.actions',
