@@ -101,6 +101,38 @@ test('选择器常量与 MobileNavOverlay 的用法保持一致', () => {
   );
 });
 
+test('抽屉层级压过 dsh-web-ui-all 的移动端遮罩 —— issue #67', () => {
+  const css = readFileSync(new URL('../client/mobile/mobile.css.ts', import.meta.url), 'utf8');
+  // web-ui-all 0.3.6 的移动端响应式：sidebar pane 1100 / details pane 1000 /
+  // frame ::after 全屏遮罩 1050。抽屉必须高于 1100，否则那层遮罩会盖在抽屉
+  // 上吃掉每一次点击 —— 抽屉能开，但里面什么都点不动，页面也滚不了。
+  const drawerBlock = css.slice(css.indexOf('> :first-child {'));
+  const z = drawerBlock.match(/z-index:\s*(\d+)\s*!/);
+  assert.ok(z, '抽屉必须显式声明 z-index !important');
+  assert.ok(
+    Number(z[1]) > 1100,
+    `抽屉 z-index ${z[1]} 压不过 web-ui-all 的 1100 sidebar pane / 1050 遮罩`,
+  );
+  assert.ok(Number(z[1]) < 9999, `抽屉 z-index ${z[1]} 不该盖住视口级 banner/toast（9999）`);
+});
+
+test('移除 web-ui-all 在 frame 上的全屏 ::after 遮罩 —— issue #67', () => {
+  const css = readFileSync(new URL('../client/mobile/mobile.css.ts', import.meta.url), 'utf8');
+  assert.ok(
+    /\[data-mobile-nav="frame"\]\s*\[data-mobile-nav="frame"\]:not\(\[data-sidebar-collapsed\]\)::after\s*\{[^}]*content:\s*none\s*!/.test(
+      css,
+    ),
+    '必须有一条把 frame 的 ::after 遮罩去掉的规则',
+  );
+  // 对方的选择器 [data-dsh-frame]:not([data-sidebar-collapsed])::after 是
+  // (0,2,1)。重复一次属性选择器把我们的抬到 (0,3,1)，这样不论插件样式表谁
+  // 后注入都由我们说了算 —— 同优先级时胜负取决于插件加载顺序，不可靠。
+  assert.ok(
+    /\[data-mobile-nav="frame"\]\s*\[data-mobile-nav="frame"\]/.test(css),
+    '遮罩规则要靠重复属性选择器提高优先级，不能依赖插件加载顺序',
+  );
+});
+
 test('打包产物里带上抽屉规则的关键字', () => {
   const bundle = readFileSync(new URL('../client/client.js', import.meta.url), 'utf8');
   // client/client.js 是 esbuild 产物，跑测试前需先 npm run build:client
