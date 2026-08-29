@@ -220,6 +220,24 @@ function PocketSettingsTab({ rpcCall, t }) {
     }
   };
 
+  // 恢复出厂设置：清本机设置 + 重设随机密码（弹窗确认；RPC 端也强制校验 confirm）
+  const [resetOpen, setResetOpen] = useState(false);
+  const doFactoryReset = async () => {
+    setResetOpen(false);
+    setBusy(true);
+    setError(null);
+    try {
+      setStatus(await call(POCKET_ENDPOINTS.pocketReset, { confirm: true }));
+      setTunnelCfg(null);
+      setCustomPin(null);
+      setAdvOpen(false);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
   // 刷新局域网访问密码（旧密码立即作废）
   const refreshLanPin = async () => {
     try {
@@ -524,6 +542,27 @@ function PocketSettingsTab({ rpcCall, t }) {
     ),
 
     error ? h('div', { style: { color: 'var(--dsw-alias-state-error-primary,#dc2626)', fontSize: 12, marginTop: 8 } }, `❌ ${errText(error)}`) : null,
+
+    // 恢复出厂设置：设置出问题时的临时兜底（最底部，避免误触）
+    h('div', { style: styles.block },
+      h('div', { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 } },
+        h('span', { style: { fontWeight: 600, fontSize: 13 } }, t('resetFactory')),
+        h('button', { style: { ...styles.btn, height: 28, padding: '0 12px', fontSize: 12, color: 'var(--dsw-alias-state-error-primary,#dc2626)' }, onClick: () => setResetOpen(true) }, t('resetGo')),
+      ),
+      h('div', { style: { ...styles.muted, marginTop: 6 } }, t('resetIntro')),
+    ),
+
+    // 恢复出厂设置确认弹框
+    resetOpen ? h('div', { style: { position: 'fixed', inset: 0, zIndex: 10000, background: 'rgba(0,0,0,.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 } },
+      h('div', { style: { background: 'var(--dsw-alias-bg-layer-1,#fff)', borderRadius: 12, maxWidth: 440, width: '100%', padding: '20px 22px', boxShadow: '0 8px 32px rgba(0,0,0,.18)' } },
+        h('div', { style: { fontWeight: 600, fontSize: 15, color: 'var(--dsw-alias-state-warn-primary,#b45309)', marginBottom: 10 } }, t('resetTitle')),
+        h('div', { style: { fontSize: 13, lineHeight: 1.7, color: 'var(--dsw-alias-label-primary,inherit)', whiteSpace: 'pre-line' } }, t('resetBody')),
+        h('div', { style: { display: 'flex', gap: 8, marginTop: 16 } },
+          h('button', { style: { ...styles.btn, flex: 1 }, onClick: () => setResetOpen(false) }, t('cancel')),
+          h('button', { style: { ...styles.primary, flex: 1, background: 'var(--dsw-alias-state-error-primary,#dc2626)' }, onClick: doFactoryReset }, t('resetConfirm')),
+        ),
+      ),
+    ) : null,
 
     // 局域网访问开关确认弹框（关闭/打开时弹窗提醒）
     lanToggleOpen !== null ? h('div', { style: { position: 'fixed', inset: 0, zIndex: 10000, background: 'rgba(0,0,0,.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 } },

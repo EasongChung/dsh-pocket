@@ -144,3 +144,37 @@ test('固定域名（issue #66）：URL 粘贴归一化、设置/清除持久化
   assert.equal(setTunnelHostname(''), '', '空字符串清除');
   assert.equal(tunnelHostname(), '', '清除生效');
 }));
+
+// ---------- 恢复出厂设置 ----------
+
+test('恢复出厂设置：清空全部设置 + 重设随机密码（开关回到默认）', () => withHome(async () => {
+  const settings = await import('../lib/settings.mjs');
+  const { setCustomPin, getAccessToken, resetPocketState } = await import('../lib/index.js');
+  // 先把设置搞成非默认：关掉开关、切命名隧道、填 Token/域名、自定义密码
+  settings.setLanEnabled(false);
+  settings.setLanAuthEnabled(false);
+  settings.setLanIpOverride('10.0.0.7');
+  settings.setTunnelMode('named');
+  settings.setTunnelToken('eyJhIjoiY2xvdWRmbGFyZS10b2tlbi1leGFtcGxlLXZhbHVlIn0');
+  settings.setTunnelHostname('pocket.example.com');
+  const customPublic = setCustomPin('public', 'aB3xY9k2');
+  const customLan = setCustomPin('lan', '77775555');
+  assert.equal(existsSync(settings.settingsPath()), true, '设置文件已写入');
+
+  const after = resetPocketState();
+  assert.notEqual(after.accessToken, customPublic, '公网密码已换新（旧密码作废）');
+  assert.notEqual(after.lanToken, customLan, '局域网密码已换新');
+  assert.match(after.accessToken, /^\d{8}$/, '新公网密码是 8 位随机');
+  assert.match(after.lanToken, /^\d{8}$/, '新局域网密码是 8 位随机');
+
+  // 全部开关回到出厂默认
+  assert.equal(settings.lanEnabled(), true, '局域网访问恢复默认开');
+  assert.equal(settings.lanAuthEnabled(), true, '访问密码恢复默认开');
+  assert.equal(settings.lanIpOverride(), '', '局域网地址恢复自动');
+  assert.equal(settings.tunnelMode(), 'quick', '公网模式恢复随机域名');
+  assert.equal(settings.tunnelToken(), '', 'Tunnel Token 已清空');
+  assert.equal(settings.tunnelHostname(), '', '固定域名已清空');
+  assert.equal(settings.pinCustom('public'), false, '公网自定义标记已清除');
+  assert.equal(settings.pinCustom('lan'), false, '局域网自定义标记已清除');
+  assert.equal(getAccessToken(), after.accessToken, '读到的公网密码与返回一致');
+}));

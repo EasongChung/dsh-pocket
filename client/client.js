@@ -53,7 +53,8 @@ var POCKET_ENDPOINTS = Object.freeze({
   lanAuthSetEnabled: "lanAuth.setEnabled",
   lanSetOverride: "lan.setOverride",
   lanSetEnabled: "lan.setEnabled",
-  pinSetCustom: "pin.setCustom"
+  pinSetCustom: "pin.setCustom",
+  pocketReset: "pocket.reset"
 });
 function compareVersions(a, b) {
   const pa = String(a).replace(/^[vV]/, "").split(".");
@@ -1370,6 +1371,12 @@ var zh2 = {
   "modeLabel": "\u5730\u5740\u6A21\u5F0F",
   "advAddress": "\u9AD8\u7EA7 \xB7 \u624B\u52A8\u9009\u5730\u5740",
   "wanOffHint": "\u5F00\u542F\u540E\u53EF\u4ECE\u4EFB\u4F55\u7F51\u7EDC\u8BBF\u95EE\uFF08\u6BCF\u6B21\u5F00\u542F\u9700\u786E\u8BA4\u514D\u8D23\u58F0\u660E\uFF09",
+  "resetFactory": "\u{1F9F9} \u6062\u590D\u51FA\u5382\u8BBE\u7F6E",
+  "resetGo": "\u6062\u590D",
+  "resetIntro": "\u8BBE\u7F6E\u641E\u51FA\u95EE\u9898\u65F6\u7684\u4E34\u65F6\u515C\u5E95\uFF1A\u6E05\u7A7A\u672C\u673A\u914D\u7F6E\u5E76\u91CD\u8BBE\u968F\u673A\u5BC6\u7801\uFF08DSH \u7684\u4F1A\u8BDD\u3001\u6A21\u578B\u3001\u63D2\u4EF6\u914D\u7F6E\u4E0D\u53D7\u5F71\u54CD\uFF09",
+  "resetTitle": "\u26A0\uFE0F \u786E\u8BA4\u6062\u590D\u51FA\u5382\u8BBE\u7F6E\uFF1F",
+  "resetBody": "\u5C06\u6E05\u7A7A\u5E76\u6062\u590D\u9ED8\u8BA4\uFF1A\n\u2460 \u5F00\u5173\uFF1A\u5C40\u57DF\u7F51\u8BBF\u95EE=\u5F00\u3001\u8BBF\u95EE\u5BC6\u7801=\u5F00\u3001\u5C40\u57DF\u7F51\u5730\u5740=\u81EA\u52A8\n\u2461 \u516C\u7F51\uFF1A\u6A21\u5F0F\u56DE\u5230\u968F\u673A\u57DF\u540D\uFF0C\u6E05\u7A7A Tunnel Token \u4E0E\u56FA\u5B9A\u57DF\u540D\uFF0C\u5E76\u5173\u95ED\u6B63\u5728\u8FD0\u884C\u7684\u516C\u7F51\n\u2462 \u5BC6\u7801\uFF1A\u516C\u7F51\u548C\u5C40\u57DF\u7F51\u90FD\u6362\u6210\u65B0\u7684\u968F\u673A 8 \u4F4D\u5BC6\u7801\uFF08\u65E7\u5BC6\u7801\u7ACB\u5373\u4F5C\u5E9F\uFF0C\u624B\u673A\u9700\u91CD\u65B0\u8F93\u5165\uFF09\n\nDSH \u81EA\u8EAB\u7684\u4F1A\u8BDD\u3001\u6A21\u578B\u3001\u63D2\u4EF6\u914D\u7F6E\u4E0D\u53D7\u5F71\u54CD\uFF1B\u6B64\u64CD\u4F5C\u4E0D\u53EF\u64A4\u9500\u3002",
+  "resetConfirm": "\u786E\u8BA4\u6062\u590D",
   "lanTitle": "\u{1F4F6} \u5C40\u57DF\u7F51\uFF08\u540C\u4E00 WiFi\uFF09",
   "lanHint": "\u624B\u673A\u8FDE\u63A5\u540C\u4E00 WiFi \u540E\u626B\u7801\u5373\u53EF\u6253\u5F00",
   "lanAccess": "\u5C40\u57DF\u7F51\u8BBF\u95EE",
@@ -1457,6 +1464,12 @@ var en2 = {
   "modeLabel": "Address mode",
   "advAddress": "Advanced \xB7 Pick address",
   "wanOffHint": "Reachable from any network once enabled (a disclaimer is confirmed on each enable)",
+  "resetFactory": "\u{1F9F9} Factory reset",
+  "resetGo": "Reset",
+  "resetIntro": "Temporary fallback when settings break: clear local config and re-roll random PINs (DSH sessions, models and plugin config are untouched)",
+  "resetTitle": "\u26A0\uFE0F Confirm factory reset?",
+  "resetBody": "This clears and restores defaults:\n\u2460 Switches: LAN access on, access PIN on, LAN address auto\n\u2461 Public: mode back to random URL, Tunnel Token and fixed domain cleared, and any running tunnel is stopped\n\u2462 PINs: both public and LAN become new random 8-character PINs (old ones stop working; the phone must re-enter)\n\nYour DSH sessions, models and plugin config are untouched. This cannot be undone.",
+  "resetConfirm": "Reset",
   "lanTitle": "\u{1F4F6} LAN (same Wi-Fi)",
   "lanHint": "Scan to open once your phone is on the same Wi-Fi",
   "lanAccess": "LAN access",
@@ -1700,6 +1713,22 @@ function PocketSettingsTab({ rpcCall, t }) {
       setTunnelCfg(null);
     } catch (err) {
       setTunnelCfg((c) => ({ ...c, err: err.message }));
+    }
+  };
+  const [resetOpen, setResetOpen] = (0, import_react2.useState)(false);
+  const doFactoryReset = async () => {
+    setResetOpen(false);
+    setBusy(true);
+    setError(null);
+    try {
+      setStatus(await call(POCKET_ENDPOINTS.pocketReset, { confirm: true }));
+      setTunnelCfg(null);
+      setCustomPin(null);
+      setAdvOpen(false);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusy(false);
     }
   };
   const refreshLanPin = async () => {
@@ -2050,6 +2079,35 @@ function PocketSettingsTab({ rpcCall, t }) {
       ) : null
     ),
     error ? (0, import_react2.createElement)("div", { style: { color: "var(--dsw-alias-state-error-primary,#dc2626)", fontSize: 12, marginTop: 8 } }, `\u274C ${errText(error)}`) : null,
+    // 恢复出厂设置：设置出问题时的临时兜底（最底部，避免误触）
+    (0, import_react2.createElement)(
+      "div",
+      { style: styles.block },
+      (0, import_react2.createElement)(
+        "div",
+        { style: { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 } },
+        (0, import_react2.createElement)("span", { style: { fontWeight: 600, fontSize: 13 } }, t("resetFactory")),
+        (0, import_react2.createElement)("button", { style: { ...styles.btn, height: 28, padding: "0 12px", fontSize: 12, color: "var(--dsw-alias-state-error-primary,#dc2626)" }, onClick: () => setResetOpen(true) }, t("resetGo"))
+      ),
+      (0, import_react2.createElement)("div", { style: { ...styles.muted, marginTop: 6 } }, t("resetIntro"))
+    ),
+    // 恢复出厂设置确认弹框
+    resetOpen ? (0, import_react2.createElement)(
+      "div",
+      { style: { position: "fixed", inset: 0, zIndex: 1e4, background: "rgba(0,0,0,.5)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 } },
+      (0, import_react2.createElement)(
+        "div",
+        { style: { background: "var(--dsw-alias-bg-layer-1,#fff)", borderRadius: 12, maxWidth: 440, width: "100%", padding: "20px 22px", boxShadow: "0 8px 32px rgba(0,0,0,.18)" } },
+        (0, import_react2.createElement)("div", { style: { fontWeight: 600, fontSize: 15, color: "var(--dsw-alias-state-warn-primary,#b45309)", marginBottom: 10 } }, t("resetTitle")),
+        (0, import_react2.createElement)("div", { style: { fontSize: 13, lineHeight: 1.7, color: "var(--dsw-alias-label-primary,inherit)", whiteSpace: "pre-line" } }, t("resetBody")),
+        (0, import_react2.createElement)(
+          "div",
+          { style: { display: "flex", gap: 8, marginTop: 16 } },
+          (0, import_react2.createElement)("button", { style: { ...styles.btn, flex: 1 }, onClick: () => setResetOpen(false) }, t("cancel")),
+          (0, import_react2.createElement)("button", { style: { ...styles.primary, flex: 1, background: "var(--dsw-alias-state-error-primary,#dc2626)" }, onClick: doFactoryReset }, t("resetConfirm"))
+        )
+      )
+    ) : null,
     // 局域网访问开关确认弹框（关闭/打开时弹窗提醒）
     lanToggleOpen !== null ? (0, import_react2.createElement)(
       "div",
