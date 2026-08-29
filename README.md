@@ -195,7 +195,7 @@ npx @deepseek-ai/dsh web
 ```sh
 npm install
 node client/build.mjs   # 改 client/ 后重新打包
-npm test                # 代理 / 认证 / 压缩 / 隧道 / 服务 / RPC / 设置（108 测试）
+npm test                # 代理 / 认证 / 压缩 / 隧道 / 服务 / RPC / 设置（109 测试）
 ```
 
 **改完想在本机先试？** 不用发版：把插件换成指向本地仓库的软链，重启 dsh web 就是本地代码。完整步骤（含怎么换回 npm 官方版本）见 [LOCAL-DEV.md](./LOCAL-DEV.md)。

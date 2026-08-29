@@ -37,7 +37,7 @@ __export(index_exports, {
   redactStatus: () => redactStatus
 });
 module.exports = __toCommonJS(index_exports);
-var import_react2 = require("react");
+var import_react3 = require("react");
 
 // client/api.js
 var POCKET_RPC_CHANNEL = "/dsh-pocket";
@@ -338,6 +338,59 @@ function MobileDrawerFooter({ useSessions, downloadSessionLog, toggleSidebar, t 
     /* @__PURE__ */ React.createElement(import_dsh_client_ui_primitives3.IconDownloadOutline16, { size: 14 }),
     /* @__PURE__ */ React.createElement("span", null, t("sessionLog"))
   ));
+}
+
+// client/mobile/MobileComposerFullscreen.tsx
+var import_react2 = require("react");
+var FULLSCREEN_ATTR = "data-dsh-pocket-composer-fullscreen";
+function isFullscreen() {
+  return typeof document !== "undefined" && document.body?.getAttribute(FULLSCREEN_ATTR) === "1";
+}
+function setFullscreen(on) {
+  if (typeof document === "undefined") return;
+  if (on) document.body.setAttribute(FULLSCREEN_ATTR, "1");
+  else document.body.removeAttribute(FULLSCREEN_ATTR);
+}
+function MobileComposerFullscreen() {
+  const [on, setOn] = (0, import_react2.useState)(isFullscreen);
+  (0, import_react2.useEffect)(() => {
+    const update = () => setOn(isFullscreen());
+    const observer = new MutationObserver(update);
+    observer.observe(document.body, { attributes: true, attributeFilter: [FULLSCREEN_ATTR] });
+    return () => observer.disconnect();
+  }, []);
+  return (0, import_react2.createElement)("button", {
+    type: "button",
+    "aria-label": on ? "\u6536\u8D77\u8F93\u5165" : "\u653E\u5927\u8F93\u5165",
+    "aria-pressed": on,
+    title: on ? "\u6536\u8D77\u8F93\u5165" : "\u653E\u5927\u8F93\u5165",
+    "data-mobile-nav": "composer-fullscreen",
+    "data-mobile-nav-keep": "1",
+    // 自己的按钮不该被 #23 的 slot 通用隐藏规则误伤
+    onClick: () => {
+      const next = !isFullscreen();
+      setFullscreen(next);
+      setOn(next);
+    },
+    style: {
+      appearance: "none",
+      WebkitAppearance: "none",
+      border: "none",
+      background: "transparent",
+      color: "inherit",
+      cursor: "pointer",
+      padding: "0 8px",
+      height: 32,
+      minWidth: 32,
+      borderRadius: 6,
+      display: "inline-flex",
+      alignItems: "center",
+      justifyContent: "center",
+      font: "inherit",
+      fontSize: 16,
+      lineHeight: 1
+    }
+  }, on ? "\u2921" : "\u2922");
 }
 
 // client/mobile/mobile.css.ts
@@ -1767,15 +1820,15 @@ var styles = {
   warn: { color: "var(--dsw-alias-state-warn-primary,#b45309)", fontSize: 12, lineHeight: 1.5 }
 };
 function PocketSettingsTab({ rpcCall, t }) {
-  const [status, setStatus] = (0, import_react2.useState)(null);
-  const [busy, setBusy] = (0, import_react2.useState)(false);
-  const [error, setError] = (0, import_react2.useState)(null);
-  const [tunnelState, setTunnelState] = (0, import_react2.useState)(null);
-  const [restartNotice, setRestartNotice] = (0, import_react2.useState)(false);
-  const [updateInfo, setUpdateInfo] = (0, import_react2.useState)(null);
-  const [isDesktop, setIsDesktop] = (0, import_react2.useState)(false);
-  const [now, setNow] = (0, import_react2.useState)(Date.now());
-  (0, import_react2.useEffect)(() => {
+  const [status, setStatus] = (0, import_react3.useState)(null);
+  const [busy, setBusy] = (0, import_react3.useState)(false);
+  const [error, setError] = (0, import_react3.useState)(null);
+  const [tunnelState, setTunnelState] = (0, import_react3.useState)(null);
+  const [restartNotice, setRestartNotice] = (0, import_react3.useState)(false);
+  const [updateInfo, setUpdateInfo] = (0, import_react3.useState)(null);
+  const [isDesktop, setIsDesktop] = (0, import_react3.useState)(false);
+  const [now, setNow] = (0, import_react3.useState)(Date.now());
+  (0, import_react3.useEffect)(() => {
     const t2 = setInterval(() => setNow(Date.now()), 1e3);
     return () => clearInterval(t2);
   }, []);
@@ -1807,18 +1860,18 @@ function PocketSettingsTab({ rpcCall, t }) {
     } catch {
     }
   };
-  (0, import_react2.useEffect)(() => {
+  (0, import_react3.useEffect)(() => {
     load();
     const t2 = setInterval(load, 3e3);
     return () => clearInterval(t2);
   }, []);
-  (0, import_react2.useEffect)(() => {
+  (0, import_react3.useEffect)(() => {
     try {
       sessionStorage.removeItem("dshp-auto-reloaded");
     } catch {
     }
   }, []);
-  (0, import_react2.useEffect)(() => {
+  (0, import_react3.useEffect)(() => {
     if (isDesktop) return;
     let alive = true;
     const check = async () => {
@@ -1874,11 +1927,11 @@ function PocketSettingsTab({ rpcCall, t }) {
       setUpdateInfo((u) => ({ ...u, updating: false, result: "fail", output: err.message }));
     }
   };
-  const [tempPinForm, setTempPinForm] = (0, import_react2.useState)({ kind: "lan", expiresInSec: 86400, label: "" });
-  const [tempPinsList, setTempPinsList] = (0, import_react2.useState)([]);
-  const [tempPinLast, setTempPinLast] = (0, import_react2.useState)(null);
-  const [tempPinBusy, setTempPinBusy] = (0, import_react2.useState)(false);
-  const [tempPinError, setTempPinError] = (0, import_react2.useState)(null);
+  const [tempPinForm, setTempPinForm] = (0, import_react3.useState)({ kind: "lan", expiresInSec: 86400, label: "" });
+  const [tempPinsList, setTempPinsList] = (0, import_react3.useState)([]);
+  const [tempPinLast, setTempPinLast] = (0, import_react3.useState)(null);
+  const [tempPinBusy, setTempPinBusy] = (0, import_react3.useState)(false);
+  const [tempPinError, setTempPinError] = (0, import_react3.useState)(null);
   const loadTempPins = async () => {
     try {
       const r = await call(POCKET_ENDPOINTS.tempPinList, {});
@@ -1886,10 +1939,10 @@ function PocketSettingsTab({ rpcCall, t }) {
     } catch {
     }
   };
-  (0, import_react2.useEffect)(() => {
+  (0, import_react3.useEffect)(() => {
     loadTempPins();
   }, []);
-  (0, import_react2.useEffect)(() => {
+  (0, import_react3.useEffect)(() => {
     if (tempPinsList.length === 0 && !tempPinLast) return;
     const t2 = setInterval(() => {
       loadTempPins();
@@ -1936,13 +1989,13 @@ function PocketSettingsTab({ rpcCall, t }) {
     if (s < 60) return `${s}s`;
     const m = Math.floor(s / 60);
     if (m < 60) return `${m}m`;
-    const h2 = Math.floor(m / 60);
-    if (h2 < 24) return `${h2}h`;
-    const d = Math.floor(h2 / 24);
+    const h3 = Math.floor(m / 60);
+    if (h3 < 24) return `${h3}h`;
+    const d = Math.floor(h3 / 24);
     return `${d}d`;
   };
-  const [disclaimerOpen, setDisclaimerOpen] = (0, import_react2.useState)(false);
-  const [disclaimerChecked, setDisclaimerChecked] = (0, import_react2.useState)(false);
+  const [disclaimerOpen, setDisclaimerOpen] = (0, import_react3.useState)(false);
+  const [disclaimerChecked, setDisclaimerChecked] = (0, import_react3.useState)(false);
   const doStartTunnel = async () => {
     const cfg = status?.tunnelConfig;
     if (cfg?.mode === "named" && (!cfg.hostname || !cfg.tokenSet)) {
@@ -1975,7 +2028,7 @@ function PocketSettingsTab({ rpcCall, t }) {
     } catch {
     }
   };
-  const [tunnelCfg, setTunnelCfg] = (0, import_react2.useState)(null);
+  const [tunnelCfg, setTunnelCfg] = (0, import_react3.useState)(null);
   const switchToQuick = async () => {
     try {
       setStatus(await call(POCKET_ENDPOINTS.tunnelSetConfig, { mode: "quick" }));
@@ -1996,7 +2049,7 @@ function PocketSettingsTab({ rpcCall, t }) {
       setTunnelCfg((c) => ({ ...c, err: err.message }));
     }
   };
-  const [resetOpen, setResetOpen] = (0, import_react2.useState)(false);
+  const [resetOpen, setResetOpen] = (0, import_react3.useState)(false);
   const doFactoryReset = async () => {
     setResetOpen(false);
     setBusy(true);
@@ -2028,7 +2081,7 @@ function PocketSettingsTab({ rpcCall, t }) {
     } catch {
     }
   };
-  const [lanToggleOpen, setLanToggleOpen] = (0, import_react2.useState)(null);
+  const [lanToggleOpen, setLanToggleOpen] = (0, import_react3.useState)(null);
   const requestLanToggle = (on) => setLanToggleOpen(on);
   const confirmLanToggle = async () => {
     const on = lanToggleOpen;
@@ -2048,7 +2101,7 @@ function PocketSettingsTab({ rpcCall, t }) {
       setError(err.message);
     }
   };
-  const [customPin, setCustomPin] = (0, import_react2.useState)(null);
+  const [customPin, setCustomPin] = (0, import_react3.useState)(null);
   const saveCustomPin = async (which) => {
     try {
       const r = await call(POCKET_ENDPOINTS.pinSetCustom, { which, value: customPin?.value ?? "" });
@@ -2064,11 +2117,11 @@ function PocketSettingsTab({ rpcCall, t }) {
       setCustomPin((c) => ({ ...c, err: err.message }));
     }
   };
-  const customPinRow = (which) => (0, import_react2.createElement)(
+  const customPinRow = (which) => (0, import_react3.createElement)(
     "div",
     { style: { marginTop: 6, fontSize: 12, color: "var(--dsw-alias-label-secondary,#6b7280)", lineHeight: 1.5 } },
     t("customizing"),
-    (0, import_react2.createElement)("input", {
+    (0, import_react3.createElement)("input", {
       style: { width: 130, margin: "0 6px", padding: "4px 8px", fontSize: 14, letterSpacing: 1, textAlign: "center", border: "1px solid var(--dsw-alias-border-l2,#d1d5db)", borderRadius: 6, outline: "none" },
       type: "password",
       maxLength: 8,
@@ -2080,11 +2133,11 @@ function PocketSettingsTab({ rpcCall, t }) {
         if (e.key === "Escape") setCustomPin(null);
       }
     }),
-    (0, import_react2.createElement)("button", { style: { ...styles.btn, height: 26, padding: "0 10px", fontSize: 12, marginLeft: 2 }, onClick: () => saveCustomPin(which) }, t("save")),
-    (0, import_react2.createElement)("button", { style: { ...styles.btn, height: 26, padding: "0 10px", fontSize: 12 }, onClick: () => setCustomPin(null) }, t("cancel")),
-    customPin?.err ? (0, import_react2.createElement)("div", { style: { color: "var(--dsw-alias-state-error-primary,#dc2626)", marginTop: 4 } }, errText(customPin.err)) : null
+    (0, import_react3.createElement)("button", { style: { ...styles.btn, height: 26, padding: "0 10px", fontSize: 12, marginLeft: 2 }, onClick: () => saveCustomPin(which) }, t("save")),
+    (0, import_react3.createElement)("button", { style: { ...styles.btn, height: 26, padding: "0 10px", fontSize: 12 }, onClick: () => setCustomPin(null) }, t("cancel")),
+    customPin?.err ? (0, import_react3.createElement)("div", { style: { color: "var(--dsw-alias-state-error-primary,#dc2626)", marginTop: 4 } }, errText(customPin.err)) : null
   );
-  const customBtn = (which) => (0, import_react2.createElement)("button", { style: { ...styles.btn, height: 26, padding: "0 10px", fontSize: 12, marginLeft: 8 }, onClick: () => setCustomPin({ which, value: "", err: null }) }, t("customize"));
+  const customBtn = (which) => (0, import_react3.createElement)("button", { style: { ...styles.btn, height: 26, padding: "0 10px", fontSize: 12, marginLeft: 8 }, onClick: () => setCustomPin({ which, value: "", err: null }) }, t("customize"));
   const lanUrl = status?.lanUrl;
   const tunnelUrl = status?.tunnelUrl;
   const tunnelPhase = tunnelState?.phase ?? "idle";
@@ -2100,14 +2153,14 @@ function PocketSettingsTab({ rpcCall, t }) {
     if (i < 0) return s;
     return (t("ok") === zh2.ok ? s.slice(0, i) : s.slice(i + 3)).trim();
   };
-  const [toast, setToast] = (0, import_react2.useState)(null);
-  const toastTimer = (0, import_react2.useRef)(null);
+  const [toast, setToast] = (0, import_react3.useState)(null);
+  const toastTimer = (0, import_react3.useRef)(null);
   const showToast = (text) => {
     setToast(text);
     clearTimeout(toastTimer.current);
     toastTimer.current = setTimeout(() => setToast(null), 2600);
   };
-  (0, import_react2.useEffect)(() => () => clearTimeout(toastTimer.current), []);
+  (0, import_react3.useEffect)(() => () => clearTimeout(toastTimer.current), []);
   const modeBtnStyle = (active) => ({
     ...styles.btn,
     height: 28,
@@ -2117,49 +2170,49 @@ function PocketSettingsTab({ rpcCall, t }) {
     background: active ? "var(--dsw-alias-button-primary-fill, var(--dsw-alias-brand-primary,#4f6ef7))" : "var(--dsw-alias-bg-layer-1,#fff)",
     color: active ? "var(--dsw-alias-label-primary-foreground, #fff)" : "var(--dsw-alias-label-primary,inherit)"
   });
-  const Switch = (on, onClick) => (0, import_react2.createElement)("button", {
+  const Switch = (on, onClick) => (0, import_react3.createElement)("button", {
     role: "switch",
     "aria-checked": !!on,
     style: { flexShrink: 0, width: 40, height: 22, borderRadius: 11, border: "none", padding: 0, position: "relative", cursor: "pointer", font: "inherit", background: on ? "var(--dsw-alias-button-primary-fill, var(--dsw-alias-brand-primary,#4f6ef7))" : "var(--dsw-alias-border-l2,#d1d5db)" },
     onClick
-  }, (0, import_react2.createElement)("span", { style: { position: "absolute", top: 2, left: on ? 20 : 2, width: 18, height: 18, borderRadius: "50%", background: "#fff" } }));
-  const qrArea = (src, url, hint) => (0, import_react2.createElement)(
+  }, (0, import_react3.createElement)("span", { style: { position: "absolute", top: 2, left: on ? 20 : 2, width: 18, height: 18, borderRadius: "50%", background: "#fff" } }));
+  const qrArea = (src, url, hint) => (0, import_react3.createElement)(
     "div",
     { style: { background: "var(--dsw-alias-bg-layer-2,#f3f4f6)", borderRadius: 10, padding: "10px 12px", textAlign: "center", margin: "10px 0" } },
-    (0, import_react2.createElement)("img", { src, alt: "QR", style: styles.qr }),
-    (0, import_react2.createElement)("div", { style: styles.code }, url),
-    (0, import_react2.createElement)("div", { style: styles.muted }, hint)
+    (0, import_react3.createElement)("img", { src, alt: "QR", style: styles.qr }),
+    (0, import_react3.createElement)("div", { style: styles.code }, url),
+    (0, import_react3.createElement)("div", { style: styles.muted }, hint)
   );
-  const row = (label, control, extra) => (0, import_react2.createElement)(
+  const row = (label, control, extra) => (0, import_react3.createElement)(
     "div",
     { style: { borderTop: "1px solid var(--dsw-alias-border-l2,#e5e7eb)", paddingTop: 9, marginTop: 9 } },
-    (0, import_react2.createElement)(
+    (0, import_react3.createElement)(
       "div",
       { style: { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 } },
-      (0, import_react2.createElement)("span", { style: { fontSize: 13 } }, label),
+      (0, import_react3.createElement)("span", { style: { fontSize: 13 } }, label),
       control
     ),
     extra ?? null
   );
-  const [advOpen, setAdvOpen] = (0, import_react2.useState)(false);
-  return (0, import_react2.createElement)(
+  const [advOpen, setAdvOpen] = (0, import_react3.useState)(false);
+  return (0, import_react3.createElement)(
     "div",
     { style: styles.card },
-    (0, import_react2.createElement)(
+    (0, import_react3.createElement)(
       "div",
       { style: { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 } },
-      (0, import_react2.createElement)(
+      (0, import_react3.createElement)(
         "div",
         null,
-        (0, import_react2.createElement)("strong", null, t("title")),
-        (0, import_react2.createElement)("div", { style: styles.muted }, t("subtitle"))
+        (0, import_react3.createElement)("strong", null, t("title")),
+        (0, import_react3.createElement)("div", { style: styles.muted }, t("subtitle"))
       ),
-      (0, import_react2.createElement)(
+      (0, import_react3.createElement)(
         "div",
         { style: { fontSize: 12, color: "var(--dsw-alias-label-tertiary,#8b93a1)", textAlign: "right" } },
-        (0, import_react2.createElement)("div", { style: { whiteSpace: "nowrap" } }, t("developer")),
-        (0, import_react2.createElement)("div", { style: { whiteSpace: "nowrap" } }, t("starAsk")),
-        (0, import_react2.createElement)(
+        (0, import_react3.createElement)("div", { style: { whiteSpace: "nowrap" } }, t("developer")),
+        (0, import_react3.createElement)("div", { style: { whiteSpace: "nowrap" } }, t("starAsk")),
+        (0, import_react3.createElement)(
           "a",
           { href: "https://github.com/shaobeichen/dsh-pocket", target: "_blank", rel: "noreferrer", style: { color: "var(--dsw-alias-brand-primary,#4f6ef7)", fontSize: 12, lineHeight: 1.6, textDecoration: "underline" } },
           t("starCta")
@@ -2168,49 +2221,49 @@ function PocketSettingsTab({ rpcCall, t }) {
     ),
     // 桌面端不显示更新/重启横幅（更新由 DSH Desktop 管理），也不需要额外提示
     // 重启后提示（进程在后台运行，停止方法）——左侧蓝色色条（桌面端不会触发本插件的自重启）
-    !isDesktop && restartNotice ? (0, import_react2.createElement)(
+    !isDesktop && restartNotice ? (0, import_react3.createElement)(
       "div",
       { style: { ...styles.block, borderLeft: "4px solid var(--dsw-alias-brand-primary,#4f6ef7)", borderRadius: 8, background: "var(--dsw-alias-bg-layer-2,#f3f4f6)", padding: "10px 12px" } },
-      (0, import_react2.createElement)(
+      (0, import_react3.createElement)(
         "div",
         { style: { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 } },
-        (0, import_react2.createElement)("div", { style: { fontWeight: 600, fontSize: 13 } }, t("restarted")),
-        (0, import_react2.createElement)("button", { style: styles.btn, onClick: () => setRestartNotice(false) }, t("ok"))
+        (0, import_react3.createElement)("div", { style: { fontWeight: 600, fontSize: 13 } }, t("restarted")),
+        (0, import_react3.createElement)("button", { style: styles.btn, onClick: () => setRestartNotice(false) }, t("ok"))
       ),
-      (0, import_react2.createElement)("div", { style: styles.muted, marginTop: 4, wordBreak: "break-all" }, fmt(t, "bgHint", { cmd: status?.killHint ?? `lsof -ti :${status?.dshPort ?? 3080} | xargs kill -9` }))
+      (0, import_react3.createElement)("div", { style: styles.muted, marginTop: 4, wordBreak: "break-all" }, fmt(t, "bgHint", { cmd: status?.killHint ?? `lsof -ti :${status?.dshPort ?? 3080} | xargs kill -9` }))
     ) : null,
     // 更新提示——左侧黄色色条（提示有新版本）；单状态：有更新/更新中/已更新自动重启，不并存
     // 桌面端不渲染（更新由 DSH Desktop 管理）
-    !isDesktop && updateInfo ? (0, import_react2.createElement)(
+    !isDesktop && updateInfo ? (0, import_react3.createElement)(
       "div",
       { style: { ...styles.block, borderLeft: "4px solid var(--dsw-alias-state-warn-primary,#b45309)", borderRadius: 8, background: "var(--dsw-alias-bg-layer-2,#f3f4f6)", padding: "10px 12px" } },
-      (0, import_react2.createElement)(
+      (0, import_react3.createElement)(
         "div",
         { style: { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 } },
-        (0, import_react2.createElement)(
+        (0, import_react3.createElement)(
           "div",
           { style: { fontWeight: 600, fontSize: 13 } },
           updateInfo.updated ? fmt(t, "updatedRestart", { ver: updateInfo.current }) : updateInfo.result === "ok" ? updateInfo.autoRestart ? fmt(t, "updateAutoRestarting", { ver: updateInfo.latest }) : fmt(t, "updatedOk", { ver: updateInfo.latest }) : fmt(t, "updateAvailable", { ver: updateInfo.latest })
         ),
-        updateInfo.result !== "ok" ? (0, import_react2.createElement)("button", { style: styles.primary, onClick: runUpdate, disabled: updateInfo.updating }, updateInfo.updating ? t("updating") : fmt(t, "updateTo", { ver: updateInfo.latest })) : updateInfo.autoRestart ? (0, import_react2.createElement)("button", { style: styles.btn, disabled: true }, t("restartingNow")) : (0, import_react2.createElement)("button", { style: styles.primary, onClick: restartPocket, disabled: updateInfo.restarting }, updateInfo.restarting ? t("restarting") : t("restartNow"))
+        updateInfo.result !== "ok" ? (0, import_react3.createElement)("button", { style: styles.primary, onClick: runUpdate, disabled: updateInfo.updating }, updateInfo.updating ? t("updating") : fmt(t, "updateTo", { ver: updateInfo.latest })) : updateInfo.autoRestart ? (0, import_react3.createElement)("button", { style: styles.btn, disabled: true }, t("restartingNow")) : (0, import_react3.createElement)("button", { style: styles.primary, onClick: restartPocket, disabled: updateInfo.restarting }, updateInfo.restarting ? t("restarting") : t("restartNow"))
       ),
-      (0, import_react2.createElement)(
+      (0, import_react3.createElement)(
         "div",
         { style: styles.muted, marginTop: 4 },
         updateInfo.updating ? fmt(t, "updatingDetail", { s: elapsed(updateInfo.startedAt) }) : updateInfo.restarting ? fmt(t, "restartingDetail", { s: elapsed(updateInfo.startedAt) }) : updateInfo.result === "ok" ? updateInfo.autoRestart ? t("updatedAutoDetail") : t("updatedRestartDetail") : updateInfo.result === "fail" ? fmt(t, "updateFailed", { err: errText(updateInfo.output) || t("unknownError") }) : fmt(t, "versionRange", { cur: updateInfo.current, latest: updateInfo.latest })
       )
     ) : null,
     // 局域网：标题行自带总开关 → 二维码+地址 → 设置行（访问密码 / 高级·手动选地址）
-    (0, import_react2.createElement)(
+    (0, import_react3.createElement)(
       "div",
       { style: styles.block },
-      (0, import_react2.createElement)(
+      (0, import_react3.createElement)(
         "div",
         { style: { display: "flex", alignItems: "center", justifyContent: "space-between" } },
-        (0, import_react2.createElement)("span", { style: { fontWeight: 600, fontSize: 13 } }, t("lanAccess")),
+        (0, import_react3.createElement)("span", { style: { fontWeight: 600, fontSize: 13 } }, t("lanAccess")),
         Switch(status?.lanEnabled !== false, () => requestLanToggle(status?.lanEnabled === false))
       ),
-      status?.lanEnabled === false ? (0, import_react2.createElement)("div", { style: { marginTop: 8, fontSize: 12, color: "var(--dsw-alias-state-warn-primary,#b45309)", lineHeight: 1.5 } }, t("lanDisabledHint")) : lanUrl ? (0, import_react2.createElement)(
+      status?.lanEnabled === false ? (0, import_react3.createElement)("div", { style: { marginTop: 8, fontSize: 12, color: "var(--dsw-alias-state-warn-primary,#b45309)", lineHeight: 1.5 } }, t("lanDisabledHint")) : lanUrl ? (0, import_react3.createElement)(
         "div",
         null,
         qrArea(status.lanQr, lanUrl, t("lanHint")),
@@ -2218,100 +2271,100 @@ function PocketSettingsTab({ rpcCall, t }) {
         row(
           t("lanPin"),
           Switch(status?.lanAuthEnabled !== false, () => setLanAuth(status?.lanAuthEnabled === false)),
-          status?.lanAuthEnabled === false ? (0, import_react2.createElement)("div", { style: { ...styles.muted, marginTop: 6 } }, t("lanPinOff")) : customPin?.which === "lan" ? customPinRow("lan") : (0, import_react2.createElement)(
+          status?.lanAuthEnabled === false ? (0, import_react3.createElement)("div", { style: { ...styles.muted, marginTop: 6 } }, t("lanPinOff")) : customPin?.which === "lan" ? customPinRow("lan") : (0, import_react3.createElement)(
             "div",
             { style: { marginTop: 6, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" } },
-            (0, import_react2.createElement)("span", { style: { fontFamily: "ui-monospace,Menlo,monospace", fontSize: 13, letterSpacing: 1 } }, status.lanToken),
-            (0, import_react2.createElement)("button", { style: { ...styles.btn, height: 26, padding: "0 10px", fontSize: 12 }, onClick: refreshLanPin }, t("refresh")),
+            (0, import_react3.createElement)("span", { style: { fontFamily: "ui-monospace,Menlo,monospace", fontSize: 13, letterSpacing: 1 } }, status.lanToken),
+            (0, import_react3.createElement)("button", { style: { ...styles.btn, height: 26, padding: "0 10px", fontSize: 12 }, onClick: refreshLanPin }, t("refresh")),
             customBtn("lan"),
-            status?.lanPinCustom ? (0, import_react2.createElement)("span", { style: { fontSize: 11, color: "var(--dsw-alias-state-warn-primary,#b45309)" } }, t("pinCustomHint")) : null
+            status?.lanPinCustom ? (0, import_react3.createElement)("span", { style: { fontSize: 11, color: "var(--dsw-alias-state-warn-primary,#b45309)" } }, t("pinCustomHint")) : null
           )
         ),
         // 高级：手动选地址（默认收起）
         row(
           t("advAddress"),
-          (0, import_react2.createElement)(
+          (0, import_react3.createElement)(
             "button",
             { style: { border: "none", background: "none", font: "inherit", cursor: "pointer", fontSize: 12, color: "var(--dsw-alias-label-tertiary,#8b93a1)", padding: 0 }, onClick: () => setAdvOpen((v) => !v) },
             (status?.lanIpOverride || t("lanAddressAuto")) + " \u203A"
           ),
-          advOpen ? (0, import_react2.createElement)(
+          advOpen ? (0, import_react3.createElement)(
             "div",
             { style: { marginTop: 8 } },
-            (0, import_react2.createElement)(
+            (0, import_react3.createElement)(
               "label",
               { style: { display: "flex", alignItems: "center", gap: 8, fontSize: 12, color: "var(--dsw-alias-label-secondary,#6b7280)" } },
               t("lanAddress"),
-              (0, import_react2.createElement)(
+              (0, import_react3.createElement)(
                 "select",
                 {
                   value: status?.lanIpOverride || "",
                   onChange: (e) => setLanAddress(e.target.value),
                   style: { font: "inherit", height: 30, padding: "0 8px", borderRadius: 8, border: "1px solid var(--dsw-alias-border-l2,#d1d5db)", background: "var(--dsw-alias-bg-layer-1,#fff)", color: "var(--dsw-alias-label-primary,inherit)" }
                 },
-                (0, import_react2.createElement)("option", { value: "" }, t("lanAddressAuto")),
-                (status?.lanCandidates || []).map((ip) => (0, import_react2.createElement)("option", { key: ip, value: ip }, ip))
+                (0, import_react3.createElement)("option", { value: "" }, t("lanAddressAuto")),
+                (status?.lanCandidates || []).map((ip) => (0, import_react3.createElement)("option", { key: ip, value: ip }, ip))
               )
             )
           ) : null
         )
-      ) : (0, import_react2.createElement)("div", { style: styles.muted }, t("lanStarting"))
+      ) : (0, import_react3.createElement)("div", { style: styles.muted }, t("lanStarting"))
     ),
     // 公网：标题行自带 开启/关闭 → 开启后：二维码+地址、地址模式行、访问密码行
-    (0, import_react2.createElement)(
+    (0, import_react3.createElement)(
       "div",
       { style: styles.block },
-      (0, import_react2.createElement)(
+      (0, import_react3.createElement)(
         "div",
         { style: { display: "flex", alignItems: "center", justifyContent: "space-between" } },
-        (0, import_react2.createElement)("span", { style: { fontWeight: 600, fontSize: 13 } }, t("wanAccess")),
-        tunnelUrl ? (0, import_react2.createElement)("button", { style: { ...styles.btn, height: 28, padding: "0 12px", fontSize: 12, color: "var(--dsw-alias-state-error-primary,#dc2626)" }, onClick: stopTunnel }, t("stopTunnel")) : (0, import_react2.createElement)("button", { style: { ...styles.primary, height: 28, padding: "0 14px", fontSize: 12 }, onClick: startTunnel, disabled: busy || tunnelStarting }, busy || tunnelStarting ? t("opening") : t("enable"))
+        (0, import_react3.createElement)("span", { style: { fontWeight: 600, fontSize: 13 } }, t("wanAccess")),
+        tunnelUrl ? (0, import_react3.createElement)("button", { style: { ...styles.btn, height: 28, padding: "0 12px", fontSize: 12, color: "var(--dsw-alias-state-error-primary,#dc2626)" }, onClick: stopTunnel }, t("stopTunnel")) : (0, import_react3.createElement)("button", { style: { ...styles.primary, height: 28, padding: "0 14px", fontSize: 12 }, onClick: startTunnel, disabled: busy || tunnelStarting }, busy || tunnelStarting ? t("opening") : t("enable"))
       ),
-      tunnelStarting ? (0, import_react2.createElement)(
+      tunnelStarting ? (0, import_react3.createElement)(
         "div",
         { style: { marginTop: 8, fontSize: 12, color: "var(--dsw-alias-label-secondary,#6b7280)" } },
         tunnelPhase === "downloading" ? fmt(t, "downloading", { s: elapsed(tunnelStateStarted) }) : fmt(t, "connecting", { s: elapsed(tunnelStateStarted), suffix: elapsed(tunnelStateStarted) > 30 ? t("slowHint") : "" })
-      ) : tunnelPhase === "error" ? (0, import_react2.createElement)(
+      ) : tunnelPhase === "error" ? (0, import_react3.createElement)(
         "div",
         { style: { marginTop: 8, fontSize: 12, color: "var(--dsw-alias-state-error-primary,#dc2626)" } },
         fmt(t, "error", { detail: errText(tunnelStateDetail) || t("unknownError") })
-      ) : !tunnelUrl && !isDesktop ? (0, import_react2.createElement)("div", { style: { ...styles.muted, marginTop: 8 } }, t("wanOffHint")) : null,
-      tunnelUrl ? (0, import_react2.createElement)(
+      ) : !tunnelUrl && !isDesktop ? (0, import_react3.createElement)("div", { style: { ...styles.muted, marginTop: 8 } }, t("wanOffHint")) : null,
+      tunnelUrl ? (0, import_react3.createElement)(
         "div",
         null,
         qrArea(status.tunnelQr, tunnelUrl, namedMode ? t("namedRunningHint") : t("wanHint")),
         // 地址模式行（随机/固定；固定域名选中或编辑时高亮）
         row(
           t("modeLabel"),
-          (0, import_react2.createElement)(
+          (0, import_react3.createElement)(
             "span",
             { style: { display: "inline-flex", gap: 6 } },
-            (0, import_react2.createElement)("button", { style: modeBtnStyle(!namedActive), onClick: namedMode ? switchToQuick : tunnelCfg ? () => setTunnelCfg(null) : void 0 }, t("modeQuick")),
-            (0, import_react2.createElement)("button", { style: modeBtnStyle(namedActive), onClick: () => setTunnelCfg(tunnelCfg ? null : { hostname: tunnelModeView.hostname ?? "", token: "", err: null }) }, t("modeNamed"))
+            (0, import_react3.createElement)("button", { style: modeBtnStyle(!namedActive), onClick: namedMode ? switchToQuick : tunnelCfg ? () => setTunnelCfg(null) : void 0 }, t("modeQuick")),
+            (0, import_react3.createElement)("button", { style: modeBtnStyle(namedActive), onClick: () => setTunnelCfg(tunnelCfg ? null : { hostname: tunnelModeView.hostname ?? "", token: "", err: null }) }, t("modeNamed"))
           ),
-          (0, import_react2.createElement)(
+          (0, import_react3.createElement)(
             "div",
             { style: { marginTop: 6 } },
             // 刚保存固定域名但当前连接仍是随机域名：需关闭后重新开启才生效
-            namedMode && /trycloudflare\.com/i.test(tunnelUrl ?? "") ? (0, import_react2.createElement)("div", { style: { ...styles.warn } }, t("namedTakeEffect")) : null,
+            namedMode && /trycloudflare\.com/i.test(tunnelUrl ?? "") ? (0, import_react3.createElement)("div", { style: { ...styles.warn } }, t("namedTakeEffect")) : null,
             // 固定域名：已保存摘要 + 修改入口（非编辑态）
-            namedMode && !tunnelCfg ? (0, import_react2.createElement)(
+            namedMode && !tunnelCfg ? (0, import_react3.createElement)(
               "div",
               { style: { ...styles.muted } },
               fmt(t, "namedSummary", { host: tunnelModeView.hostname || "\u2014", token: tunnelModeView.tokenSet ? t("namedTokenSet") : t("namedTokenMissing") }),
-              (0, import_react2.createElement)("button", { style: { ...styles.btn, height: 26, padding: "0 10px", fontSize: 12, marginLeft: 8 }, onClick: () => setTunnelCfg({ hostname: tunnelModeView.hostname ?? "", token: "", err: null }) }, t("namedEdit")),
-              (0, import_react2.createElement)("div", { style: { ...styles.muted, marginTop: 4 } }, t("namedHow")),
-              !tunnelModeView.tokenSet || !tunnelModeView.hostname ? (0, import_react2.createElement)("div", { style: { marginTop: 2, color: "var(--dsw-alias-state-error-primary,#dc2626)" } }, t("namedNeedCfg")) : null
+              (0, import_react3.createElement)("button", { style: { ...styles.btn, height: 26, padding: "0 10px", fontSize: 12, marginLeft: 8 }, onClick: () => setTunnelCfg({ hostname: tunnelModeView.hostname ?? "", token: "", err: null }) }, t("namedEdit")),
+              (0, import_react3.createElement)("div", { style: { ...styles.muted, marginTop: 4 } }, t("namedHow")),
+              !tunnelModeView.tokenSet || !tunnelModeView.hostname ? (0, import_react3.createElement)("div", { style: { marginTop: 2, color: "var(--dsw-alias-state-error-primary,#dc2626)" } }, t("namedNeedCfg")) : null
             ) : null,
             // 固定域名：编辑表单（域名 + Tunnel Token，Token 留空保持不变）
-            tunnelCfg ? (0, import_react2.createElement)(
+            tunnelCfg ? (0, import_react3.createElement)(
               "div",
               { style: { marginTop: 6, fontSize: 12, color: "var(--dsw-alias-label-secondary,#6b7280)", lineHeight: 1.6 } },
-              (0, import_react2.createElement)(
+              (0, import_react3.createElement)(
                 "div",
                 null,
                 t("namedHostnameLabel"),
-                (0, import_react2.createElement)("input", {
+                (0, import_react3.createElement)("input", {
                   style: { margin: "4px 0 0 6px", padding: "4px 8px", fontSize: 13, border: "1px solid var(--dsw-alias-border-l2,#d1d5db)", borderRadius: 6, outline: "none", width: 200 },
                   placeholder: "pocket.example.com",
                   value: tunnelCfg.hostname ?? "",
@@ -2323,11 +2376,11 @@ function PocketSettingsTab({ rpcCall, t }) {
                   }
                 })
               ),
-              (0, import_react2.createElement)(
+              (0, import_react3.createElement)(
                 "div",
                 { style: { marginTop: 6 } },
                 t("namedTokenLabel"),
-                (0, import_react2.createElement)("input", {
+                (0, import_react3.createElement)("input", {
                   style: { margin: "4px 0 0 6px", padding: "4px 8px", fontSize: 13, border: "1px solid var(--dsw-alias-border-l2,#d1d5db)", borderRadius: 6, outline: "none", width: 240, fontFamily: "ui-monospace,Menlo,monospace" },
                   type: "password",
                   value: tunnelCfg.token ?? "",
@@ -2338,70 +2391,70 @@ function PocketSettingsTab({ rpcCall, t }) {
                   }
                 })
               ),
-              (0, import_react2.createElement)(
+              (0, import_react3.createElement)(
                 "div",
                 { style: { marginTop: 6, display: "flex", gap: 8 } },
-                (0, import_react2.createElement)("button", { style: { ...styles.btn, height: 26, padding: "0 10px", fontSize: 12 }, onClick: saveNamedTunnel }, t("save")),
-                (0, import_react2.createElement)("button", { style: { ...styles.btn, height: 26, padding: "0 10px", fontSize: 12 }, onClick: () => setTunnelCfg(null) }, t("cancel"))
+                (0, import_react3.createElement)("button", { style: { ...styles.btn, height: 26, padding: "0 10px", fontSize: 12 }, onClick: saveNamedTunnel }, t("save")),
+                (0, import_react3.createElement)("button", { style: { ...styles.btn, height: 26, padding: "0 10px", fontSize: 12 }, onClick: () => setTunnelCfg(null) }, t("cancel"))
               ),
-              (0, import_react2.createElement)("div", { style: { ...styles.muted, marginTop: 6 } }, t("namedHow")),
-              (0, import_react2.createElement)("div", { style: { marginTop: 2, fontSize: 11, color: "var(--dsw-alias-state-warn-primary,#b45309)", lineHeight: 1.5 } }, t("namedSecurity")),
-              tunnelCfg.err ? (0, import_react2.createElement)("div", { style: { color: "var(--dsw-alias-state-error-primary,#dc2626)", marginTop: 4 } }, errText(tunnelCfg.err)) : null
+              (0, import_react3.createElement)("div", { style: { ...styles.muted, marginTop: 6 } }, t("namedHow")),
+              (0, import_react3.createElement)("div", { style: { marginTop: 2, fontSize: 11, color: "var(--dsw-alias-state-warn-primary,#b45309)", lineHeight: 1.5 } }, t("namedSecurity")),
+              tunnelCfg.err ? (0, import_react3.createElement)("div", { style: { color: "var(--dsw-alias-state-error-primary,#dc2626)", marginTop: 4 } }, errText(tunnelCfg.err)) : null
             ) : null
           )
         ),
         // 访问密码行：值 + 自定义（自定义输入态整体替换）
         status.accessToken ? row(
           t("pinLabel"),
-          customPin?.which === "public" ? null : (0, import_react2.createElement)(
+          customPin?.which === "public" ? null : (0, import_react3.createElement)(
             "span",
             { style: { display: "inline-flex", alignItems: "center", gap: 8 } },
-            (0, import_react2.createElement)("span", { style: { fontFamily: "ui-monospace,Menlo,monospace", fontSize: 13, letterSpacing: 1 } }, status.accessToken),
+            (0, import_react3.createElement)("span", { style: { fontFamily: "ui-monospace,Menlo,monospace", fontSize: 13, letterSpacing: 1 } }, status.accessToken),
             customBtn("public")
           ),
-          (0, import_react2.createElement)(
+          (0, import_react3.createElement)(
             "div",
             { style: { marginTop: 6 } },
             customPin?.which === "public" ? customPinRow("public") : null,
-            status?.publicPinCustom ? (0, import_react2.createElement)("div", { style: { ...styles.warn } }, t("pinCustomHint")) : null,
-            namedMode ? (0, import_react2.createElement)("div", { style: { ...styles.warn } }, t("namedSecurity")) : null
+            status?.publicPinCustom ? (0, import_react3.createElement)("div", { style: { ...styles.warn } }, t("pinCustomHint")) : null,
+            namedMode ? (0, import_react3.createElement)("div", { style: { ...styles.warn } }, t("namedSecurity")) : null
           )
         ) : null
       ) : null
     ),
-    error ? (0, import_react2.createElement)("div", { style: { color: "var(--dsw-alias-state-error-primary,#dc2626)", fontSize: 12, marginTop: 8 } }, `\u274C ${errText(error)}`) : null,
+    error ? (0, import_react3.createElement)("div", { style: { color: "var(--dsw-alias-state-error-primary,#dc2626)", fontSize: 12, marginTop: 8 } }, `\u274C ${errText(error)}`) : null,
     // 临时 PIN（issue #69）：带过期的访问密码，给访客用
-    (0, import_react2.createElement)(
+    (0, import_react3.createElement)(
       "div",
       { style: styles.block },
-      (0, import_react2.createElement)("div", { style: { fontWeight: 600, fontSize: 13, marginBottom: 4 } }, t("tempPinTitle")),
-      (0, import_react2.createElement)("div", { style: { ...styles.muted, marginBottom: 10 } }, t("tempPinSubtitle")),
+      (0, import_react3.createElement)("div", { style: { fontWeight: 600, fontSize: 13, marginBottom: 4 } }, t("tempPinTitle")),
+      (0, import_react3.createElement)("div", { style: { ...styles.muted, marginBottom: 10 } }, t("tempPinSubtitle")),
       // 生成表单：分类 + 时长 + 备注 + 生成
-      (0, import_react2.createElement)(
+      (0, import_react3.createElement)(
         "div",
         { style: { display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" } },
-        (0, import_react2.createElement)(
+        (0, import_react3.createElement)(
           "select",
           {
             value: tempPinForm.kind,
             onChange: (e) => setTempPinForm((f) => ({ ...f, kind: e.target.value })),
             style: { font: "inherit", height: 30, padding: "0 8px", borderRadius: 8, border: "1px solid var(--dsw-alias-border-l2,#d1d5db)", background: "var(--dsw-alias-bg-layer-1,#fff)", color: "var(--dsw-alias-label-primary,inherit)" }
           },
-          (0, import_react2.createElement)("option", { value: "public" }, t("tempPinKindPublic")),
-          (0, import_react2.createElement)("option", { value: "lan" }, t("tempPinKindLan"))
+          (0, import_react3.createElement)("option", { value: "public" }, t("tempPinKindPublic")),
+          (0, import_react3.createElement)("option", { value: "lan" }, t("tempPinKindLan"))
         ),
-        (0, import_react2.createElement)(
+        (0, import_react3.createElement)(
           "select",
           {
             value: String(tempPinForm.expiresInSec),
             onChange: (e) => setTempPinForm((f) => ({ ...f, expiresInSec: Number(e.target.value) })),
             style: { font: "inherit", height: 30, padding: "0 8px", borderRadius: 8, border: "1px solid var(--dsw-alias-border-l2,#d1d5db)", background: "var(--dsw-alias-bg-layer-1,#fff)", color: "var(--dsw-alias-label-primary,inherit)" }
           },
-          (0, import_react2.createElement)("option", { value: "3600" }, t("tempPinDuration1h")),
-          (0, import_react2.createElement)("option", { value: "86400" }, t("tempPinDuration24h")),
-          (0, import_react2.createElement)("option", { value: "604800" }, t("tempPinDuration7d"))
+          (0, import_react3.createElement)("option", { value: "3600" }, t("tempPinDuration1h")),
+          (0, import_react3.createElement)("option", { value: "86400" }, t("tempPinDuration24h")),
+          (0, import_react3.createElement)("option", { value: "604800" }, t("tempPinDuration7d"))
         ),
-        (0, import_react2.createElement)("input", {
+        (0, import_react3.createElement)("input", {
           style: { flex: 1, minWidth: 120, height: 30, padding: "0 10px", borderRadius: 8, border: "1px solid var(--dsw-alias-border-l2,#d1d5db)", fontSize: 13, outline: "none" },
           placeholder: t("tempPinLabelPh"),
           value: tempPinForm.label,
@@ -2410,120 +2463,120 @@ function PocketSettingsTab({ rpcCall, t }) {
             if (e.key === "Enter") createTempPinNow();
           }
         }),
-        (0, import_react2.createElement)("button", { style: { ...styles.btn, height: 30 }, onClick: createTempPinNow, disabled: tempPinBusy }, t("tempPinCreate"))
+        (0, import_react3.createElement)("button", { style: { ...styles.btn, height: 30 }, onClick: createTempPinNow, disabled: tempPinBusy }, t("tempPinCreate"))
       ),
       // 错误展示
-      tempPinError ? (0, import_react2.createElement)("div", { style: { color: "var(--dsw-alias-state-error-primary,#dc2626)", fontSize: 12, marginTop: 6 } }, errText(tempPinError)) : null,
+      tempPinError ? (0, import_react3.createElement)("div", { style: { color: "var(--dsw-alias-state-error-primary,#dc2626)", fontSize: 12, marginTop: 6 } }, errText(tempPinError)) : null,
       // 刚生成的那一个（高亮，下一秒会消失提示用户立刻复制）
-      tempPinLast ? (0, import_react2.createElement)(
+      tempPinLast ? (0, import_react3.createElement)(
         "div",
         { style: { marginTop: 10, padding: "8px 10px", borderRadius: 8, background: "var(--dsw-alias-bg-layer-2,#f3f4f6)", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, flexWrap: "wrap" } },
-        (0, import_react2.createElement)(
+        (0, import_react3.createElement)(
           "div",
           null,
-          (0, import_react2.createElement)("div", { style: { fontSize: 11, color: "var(--dsw-alias-state-success-primary,#16a34a)", fontWeight: 600, marginBottom: 2 } }, `${t("tempPinCreated")} \xB7 ${tempPinLast.kind === "public" ? t("tempPinKindPublic") : t("tempPinKindLan")} \xB7 ${formatRemaining(tempPinLast.expiresAt)}`),
-          (0, import_react2.createElement)("span", { style: { fontFamily: "ui-monospace,Menlo,monospace", fontSize: 16, letterSpacing: 2, fontWeight: 600 } }, tempPinLast.value)
+          (0, import_react3.createElement)("div", { style: { fontSize: 11, color: "var(--dsw-alias-state-success-primary,#16a34a)", fontWeight: 600, marginBottom: 2 } }, `${t("tempPinCreated")} \xB7 ${tempPinLast.kind === "public" ? t("tempPinKindPublic") : t("tempPinKindLan")} \xB7 ${formatRemaining(tempPinLast.expiresAt)}`),
+          (0, import_react3.createElement)("span", { style: { fontFamily: "ui-monospace,Menlo,monospace", fontSize: 16, letterSpacing: 2, fontWeight: 600 } }, tempPinLast.value)
         ),
-        (0, import_react2.createElement)("button", { style: { ...styles.btn, height: 28, padding: "0 12px", fontSize: 12 }, onClick: () => copyTempPin(tempPinLast.value) }, t("tempPinCopy"))
+        (0, import_react3.createElement)("button", { style: { ...styles.btn, height: 28, padding: "0 12px", fontSize: 12 }, onClick: () => copyTempPin(tempPinLast.value) }, t("tempPinCopy"))
       ) : null,
       // 列表
-      (0, import_react2.createElement)(
+      (0, import_react3.createElement)(
         "div",
         { style: { marginTop: 12, borderTop: "1px solid var(--dsw-alias-border-l2,#e5e7eb)", paddingTop: 8 } },
-        tempPinsList.length === 0 ? (0, import_react2.createElement)("div", { style: { ...styles.muted, padding: "6px 0" } }, t("tempPinEmpty")) : tempPinsList.map((p) => (0, import_react2.createElement)(
+        tempPinsList.length === 0 ? (0, import_react3.createElement)("div", { style: { ...styles.muted, padding: "6px 0" } }, t("tempPinEmpty")) : tempPinsList.map((p) => (0, import_react3.createElement)(
           "div",
           { key: p.value, style: { display: "flex", alignItems: "center", gap: 8, padding: "6px 0", borderBottom: "1px solid var(--dsw-alias-border-l2,#e5e7eb)" } },
-          (0, import_react2.createElement)("span", { style: { fontSize: 11, color: "var(--dsw-alias-label-tertiary,#8b93a1)", minWidth: 50 } }, p.kind === "public" ? t("tempPinKindPublic") : t("tempPinKindLan")),
-          (0, import_react2.createElement)("span", { style: { fontFamily: "ui-monospace,Menlo,monospace", fontSize: 13, letterSpacing: 1, flexShrink: 0 } }, p.value),
-          (0, import_react2.createElement)("span", { style: { ...styles.muted, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, p.label || "\u2014"),
-          (0, import_react2.createElement)("span", { style: { fontSize: 11, color: "var(--dsw-alias-label-tertiary,#8b93a1)" } }, `${t("tempPinExpiresIn")} ${formatRemaining(p.expiresAt)}`),
-          (0, import_react2.createElement)("button", { style: { ...styles.btn, height: 24, padding: "0 10px", fontSize: 11 }, onClick: () => revokeTempPinNow(p) }, t("tempPinRevoke"))
+          (0, import_react3.createElement)("span", { style: { fontSize: 11, color: "var(--dsw-alias-label-tertiary,#8b93a1)", minWidth: 50 } }, p.kind === "public" ? t("tempPinKindPublic") : t("tempPinKindLan")),
+          (0, import_react3.createElement)("span", { style: { fontFamily: "ui-monospace,Menlo,monospace", fontSize: 13, letterSpacing: 1, flexShrink: 0 } }, p.value),
+          (0, import_react3.createElement)("span", { style: { ...styles.muted, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, p.label || "\u2014"),
+          (0, import_react3.createElement)("span", { style: { fontSize: 11, color: "var(--dsw-alias-label-tertiary,#8b93a1)" } }, `${t("tempPinExpiresIn")} ${formatRemaining(p.expiresAt)}`),
+          (0, import_react3.createElement)("button", { style: { ...styles.btn, height: 24, padding: "0 10px", fontSize: 11 }, onClick: () => revokeTempPinNow(p) }, t("tempPinRevoke"))
         ))
       )
     ),
     // 恢复出厂设置：设置出问题时的临时兜底（最底部，避免误触）
-    (0, import_react2.createElement)(
+    (0, import_react3.createElement)(
       "div",
       { style: styles.block },
-      (0, import_react2.createElement)(
+      (0, import_react3.createElement)(
         "div",
         { style: { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 } },
-        (0, import_react2.createElement)("span", { style: { fontWeight: 600, fontSize: 13 } }, t("resetFactory")),
-        (0, import_react2.createElement)("button", { style: { ...styles.btn, height: 28, padding: "0 12px", fontSize: 12, color: "var(--dsw-alias-state-error-primary,#dc2626)" }, onClick: () => setResetOpen(true) }, t("resetGo"))
+        (0, import_react3.createElement)("span", { style: { fontWeight: 600, fontSize: 13 } }, t("resetFactory")),
+        (0, import_react3.createElement)("button", { style: { ...styles.btn, height: 28, padding: "0 12px", fontSize: 12, color: "var(--dsw-alias-state-error-primary,#dc2626)" }, onClick: () => setResetOpen(true) }, t("resetGo"))
       ),
-      (0, import_react2.createElement)("div", { style: { ...styles.muted, marginTop: 6 } }, t("resetIntro"))
+      (0, import_react3.createElement)("div", { style: { ...styles.muted, marginTop: 6 } }, t("resetIntro"))
     ),
     // 恢复出厂设置确认弹框
-    resetOpen ? (0, import_react2.createElement)(
+    resetOpen ? (0, import_react3.createElement)(
       "div",
       { style: { position: "fixed", inset: 0, zIndex: 1e4, background: "rgba(0,0,0,.5)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 } },
-      (0, import_react2.createElement)(
+      (0, import_react3.createElement)(
         "div",
         { style: { background: "var(--dsw-alias-bg-layer-1,#fff)", borderRadius: 12, maxWidth: 440, width: "100%", padding: "20px 22px", boxShadow: "0 8px 32px rgba(0,0,0,.18)" } },
-        (0, import_react2.createElement)("div", { style: { fontWeight: 600, fontSize: 15, color: "var(--dsw-alias-state-warn-primary,#b45309)", marginBottom: 10 } }, t("resetTitle")),
-        (0, import_react2.createElement)("div", { style: { fontSize: 13, lineHeight: 1.7, color: "var(--dsw-alias-label-primary,inherit)", whiteSpace: "pre-line" } }, t("resetBody")),
-        (0, import_react2.createElement)(
+        (0, import_react3.createElement)("div", { style: { fontWeight: 600, fontSize: 15, color: "var(--dsw-alias-state-warn-primary,#b45309)", marginBottom: 10 } }, t("resetTitle")),
+        (0, import_react3.createElement)("div", { style: { fontSize: 13, lineHeight: 1.7, color: "var(--dsw-alias-label-primary,inherit)", whiteSpace: "pre-line" } }, t("resetBody")),
+        (0, import_react3.createElement)(
           "div",
           { style: { display: "flex", gap: 8, marginTop: 16 } },
-          (0, import_react2.createElement)("button", { style: { ...styles.btn, flex: 1 }, onClick: () => setResetOpen(false) }, t("cancel")),
-          (0, import_react2.createElement)("button", { style: { ...styles.primary, flex: 1, background: "var(--dsw-alias-state-error-primary,#dc2626)" }, onClick: doFactoryReset }, t("resetConfirm"))
+          (0, import_react3.createElement)("button", { style: { ...styles.btn, flex: 1 }, onClick: () => setResetOpen(false) }, t("cancel")),
+          (0, import_react3.createElement)("button", { style: { ...styles.primary, flex: 1, background: "var(--dsw-alias-state-error-primary,#dc2626)" }, onClick: doFactoryReset }, t("resetConfirm"))
         )
       )
     ) : null,
     // Toast：重置等操作的即时反馈（固定屏幕正中央，2.6s 自动消失）
-    toast ? (0, import_react2.createElement)("div", {
+    toast ? (0, import_react3.createElement)("div", {
       style: { position: "fixed", left: "50%", top: "50%", transform: "translate(-50%, -50%)", zIndex: 10001, width: "auto", maxWidth: 280, background: "rgba(17,24,39,.92)", color: "#fff", border: "none", borderRadius: 10, padding: "10px 16px", fontSize: 13, lineHeight: 1.5, textAlign: "center", boxShadow: "0 8px 24px rgba(0,0,0,.22)" }
     }, toast) : null,
     // 局域网访问开关确认弹框（关闭/打开时弹窗提醒）
-    lanToggleOpen !== null ? (0, import_react2.createElement)(
+    lanToggleOpen !== null ? (0, import_react3.createElement)(
       "div",
       { style: { position: "fixed", inset: 0, zIndex: 1e4, background: "rgba(0,0,0,.5)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 } },
-      (0, import_react2.createElement)(
+      (0, import_react3.createElement)(
         "div",
         { style: { background: "var(--dsw-alias-bg-layer-1,#fff)", borderRadius: 12, maxWidth: 420, width: "100%", padding: "20px 22px", boxShadow: "0 8px 32px rgba(0,0,0,.18)" } },
-        (0, import_react2.createElement)("div", { style: { fontWeight: 600, fontSize: 15, color: lanToggleOpen ? "var(--dsw-alias-brand-primary,#4f6ef7)" : "var(--dsw-alias-state-warn-primary,#b45309)", marginBottom: 10 } }, t(lanToggleOpen ? "lanToggleTitleOn" : "lanToggleTitleOff")),
-        (0, import_react2.createElement)("div", { style: { fontSize: 13, lineHeight: 1.7, color: "var(--dsw-alias-label-primary,inherit)" } }, t(lanToggleOpen ? "lanToggleBodyOn" : "lanToggleBodyOff")),
-        (0, import_react2.createElement)(
+        (0, import_react3.createElement)("div", { style: { fontWeight: 600, fontSize: 15, color: lanToggleOpen ? "var(--dsw-alias-brand-primary,#4f6ef7)" : "var(--dsw-alias-state-warn-primary,#b45309)", marginBottom: 10 } }, t(lanToggleOpen ? "lanToggleTitleOn" : "lanToggleTitleOff")),
+        (0, import_react3.createElement)("div", { style: { fontSize: 13, lineHeight: 1.7, color: "var(--dsw-alias-label-primary,inherit)" } }, t(lanToggleOpen ? "lanToggleBodyOn" : "lanToggleBodyOff")),
+        (0, import_react3.createElement)(
           "div",
           { style: { display: "flex", gap: 8, marginTop: 16 } },
-          (0, import_react2.createElement)("button", { style: { ...styles.btn, flex: 1 }, onClick: () => setLanToggleOpen(null) }, t("cancel")),
-          (0, import_react2.createElement)("button", { style: { ...styles.primary, flex: 1 }, onClick: confirmLanToggle }, t("confirm"))
+          (0, import_react3.createElement)("button", { style: { ...styles.btn, flex: 1 }, onClick: () => setLanToggleOpen(null) }, t("cancel")),
+          (0, import_react3.createElement)("button", { style: { ...styles.primary, flex: 1 }, onClick: confirmLanToggle }, t("confirm"))
         )
       )
     ) : null,
     // 安全免责声明弹框（issue #31）：每次开启公网访问前确认
-    disclaimerOpen ? (0, import_react2.createElement)(
+    disclaimerOpen ? (0, import_react3.createElement)(
       "div",
       { style: { position: "fixed", inset: 0, zIndex: 1e4, background: "rgba(0,0,0,.5)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 } },
-      (0, import_react2.createElement)(
+      (0, import_react3.createElement)(
         "div",
         { style: { background: "var(--dsw-alias-bg-layer-1,#fff)", borderRadius: 12, maxWidth: 420, width: "100%", padding: "20px 22px", boxShadow: "0 8px 32px rgba(0,0,0,.18)" } },
-        (0, import_react2.createElement)("div", { style: { fontWeight: 600, fontSize: 15, color: "var(--dsw-alias-state-warn-primary,#b45309)", marginBottom: 10 } }, t("disclaimerTitle")),
-        (0, import_react2.createElement)("div", { style: { fontSize: 13, lineHeight: 1.7, color: "var(--dsw-alias-label-primary,inherit)" } }, t("disclaimerBody")),
-        (0, import_react2.createElement)(
+        (0, import_react3.createElement)("div", { style: { fontWeight: 600, fontSize: 15, color: "var(--dsw-alias-state-warn-primary,#b45309)", marginBottom: 10 } }, t("disclaimerTitle")),
+        (0, import_react3.createElement)("div", { style: { fontSize: 13, lineHeight: 1.7, color: "var(--dsw-alias-label-primary,inherit)" } }, t("disclaimerBody")),
+        (0, import_react3.createElement)(
           "label",
           { style: { display: "flex", alignItems: "center", gap: 8, marginTop: 14, fontSize: 13, cursor: "pointer" } },
-          (0, import_react2.createElement)("input", { type: "checkbox", checked: disclaimerChecked, onChange: (e) => setDisclaimerChecked(e.target.checked), style: { width: 16, height: 16 } }),
+          (0, import_react3.createElement)("input", { type: "checkbox", checked: disclaimerChecked, onChange: (e) => setDisclaimerChecked(e.target.checked), style: { width: 16, height: 16 } }),
           t("disclaimerAgree")
         ),
-        (0, import_react2.createElement)(
+        (0, import_react3.createElement)(
           "div",
           { style: { display: "flex", gap: 8, marginTop: 16 } },
-          (0, import_react2.createElement)("button", { style: { ...styles.btn, flex: 1 }, onClick: () => setDisclaimerOpen(false) }, t("cancel")),
-          (0, import_react2.createElement)("button", {
+          (0, import_react3.createElement)("button", { style: { ...styles.btn, flex: 1 }, onClick: () => setDisclaimerOpen(false) }, t("cancel")),
+          (0, import_react3.createElement)("button", {
             style: { ...styles.primary, flex: 1, opacity: disclaimerChecked ? 1 : 0.5 },
             disabled: !disclaimerChecked,
             onClick: confirmDisclaimer
           }, t("disclaimerAgree"))
         ),
-        !disclaimerChecked ? (0, import_react2.createElement)("div", { style: { marginTop: 8, fontSize: 12, color: "var(--dsw-alias-state-error-primary,#dc2626)" } }, t("disclaimerHint")) : null
+        !disclaimerChecked ? (0, import_react3.createElement)("div", { style: { marginTop: 8, fontSize: 12, color: "var(--dsw-alias-state-error-primary,#dc2626)" } }, t("disclaimerHint")) : null
       )
     ) : null,
     // 页面最底部：反馈入口
-    (0, import_react2.createElement)(
+    (0, import_react3.createElement)(
       "div",
       { style: { ...styles.block, textAlign: "center" } },
-      (0, import_react2.createElement)(
+      (0, import_react3.createElement)(
         "a",
         { href: "https://github.com/shaobeichen/dsh-pocket/issues", target: "_blank", rel: "noreferrer", style: { fontSize: 12, color: "var(--dsw-alias-label-secondary,#6b7280)", textDecoration: "none" } },
         t("feedback")

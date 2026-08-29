@@ -140,3 +140,35 @@ test('打包产物里带上抽屉规则的关键字', () => {
     assert.ok(bundle.includes(needle), `打包产物缺少 "${needle}" —— 先跑 npm run build:client`);
   }
 });
+
+test('打包产物：mobile-apply 引用的组件都有 import 且有定义', () => {
+  const src = readFileSync(new URL('../client/mobile/mobile-apply.tsx', import.meta.url), 'utf8');
+  const bundle = readFileSync(new URL('../client/client.js', import.meta.url), 'utf8');
+  // import type 进来的是纯类型，产物里没有运行时定义 —— 只检查值组件
+  const typeOnly = new Set();
+  for (const m of src.matchAll(/^import\s+type\s+(?:\{([^}]*)\}|(\w+))\s+from/gm)) {
+    for (const part of (m[1] ?? m[2] ?? '').split(',')) {
+      const n = part.trim().split(/\s+as\s+/).pop().trim();
+      if (n) typeOnly.add(n);
+    }
+  }
+  const used = [...new Set([...src.matchAll(/\b(Mobile[A-Za-z0-9_]*)\b/g)].map((m) => m[1]))].filter(
+    // 排除纯类型；再排除光秃秃的 "Mobile"（注释里的 Mobile-adaptive 之类）
+    (n) => !typeOnly.has(n) && /^Mobile[A-Z]/.test(n),
+  );
+  assert.ok(used.length >= 4, `预期至少 4 个 Mobile* 组件，实际 ${used.length}`);
+
+  for (const name of used) {
+    // ① 必须在源码里 import —— esbuild 不检查未定义标识符，漏了能照常打包，
+    //    到浏览器里才炸：apply 时 "<name> is not defined" → 整个插件
+    //    Failed to load plugins（2.6.0 / 2.6.1 就漏了 MobileComposerFullscreen）。
+    assert.match(
+      src,
+      new RegExp(`import\\s+(?:type\\s+)?(?:\\{[^}]*\\b${name}\\b[^}]*\\}|${name})\\s+from`),
+      `${name} 在 mobile-apply.tsx 里被用到但没有 import`,
+    );
+    // ② 产物里必须有定义（只有引用没有定义 = 悬空全局引用）
+    const defs = (bundle.match(new RegExp(`(?:function\\s+${name}\\b|\\b${name}\\s*=)`, 'g')) ?? []).length;
+    assert.ok(defs >= 1, `${name} 在打包产物里只有引用、没有定义 —— 漏 import 会让整个插件加载失败`);
+  }
+});
