@@ -140,6 +140,41 @@ function MobileNavToggle({ toggleSidebar, t }) {
 // client/mobile/MobileNavOverlay.tsx
 var import_react = require("react");
 var import_dsh_client_ui_primitives2 = require("@deepseek-ai/dsh-client-ui-primitives");
+
+// client/mobile/nav-targets.mjs
+var DRAWER_SELECTOR = '[data-mobile-nav="frame"] > :first-child';
+var TOGGLE_SELECTOR = '[data-mobile-nav="toggle"]';
+var NAV_TARGETS = [
+  "button[data-dsh-taskboard-entry]",
+  "button[data-dsh-ssh-entry]",
+  // 抽屉底部的 "文件" 入口打开的是 dsh-web-ui 的 explorer 面板，它的 z-index
+  // (55) 低于展开的抽屉 (600)，且在抽屉 DOM 之外：抽屉不关就会盖住面板，点
+  // 面板里的行又会被"点抽屉外就关"吃掉。所以按导航处理，一起关掉。
+  '[data-mobile-nav="files"]',
+  '[class*="sessionRow"]',
+  '[class*="newSession"]',
+  '[class*="searchResultWorkspace"]',
+  '[class*="searchResultRow"]'
+].join(", ");
+var NAV_EXCLUDE = '[class*="sessionRow"] button';
+var OVERLAY_SELECTOR = [
+  '[role="menu"]',
+  '[role="listbox"]',
+  '[role="dialog"]',
+  '[role="tooltip"]',
+  "[data-radix-popper-content-wrapper]"
+].join(", ");
+function navTargetFor(target) {
+  if (target == null || typeof target.closest !== "function") return null;
+  if (target.closest(NAV_EXCLUDE) !== null) return null;
+  return target.closest(NAV_TARGETS);
+}
+function isOverlayTap(target) {
+  if (target == null || typeof target.closest !== "function") return false;
+  return target.closest(OVERLAY_SELECTOR) !== null;
+}
+
+// client/mobile/MobileNavOverlay.tsx
 var MOBILE_QUERY = "(max-width: 1023px)";
 function useMobile() {
   const [mobile, setMobile] = (0, import_react.useState)(() => window.matchMedia(MOBILE_QUERY).matches);
@@ -205,25 +240,47 @@ function MobileNavOverlay({ toggleSidebar, t }) {
       if (document.querySelector('[aria-modal="true"]') !== null) return;
       const target = event.target;
       if (target === null) return;
-      const drawer = document.querySelector('[data-mobile-nav="frame"] > :first-child');
+      const drawer = document.querySelector(DRAWER_SELECTOR);
       if (drawer === null || !drawer.contains(target)) return;
-      if (target.closest('[class*="sessionRow"] button') !== null) return;
-      const navigates = target.closest(
-        'button[data-dsh-taskboard-entry], button[data-dsh-ssh-entry], [class*="newSession"], [class*="sessionRow"], [class*="searchResultRow"], [class*="searchResultWorkspace"], [data-mobile-nav="files"]'
-      );
-      if (navigates !== null) toggleSidebar();
+      if (navTargetFor(target) !== null) toggleSidebar();
     };
     document.addEventListener("click", onDrawerClick, true);
     return () => document.removeEventListener("click", onDrawerClick, true);
   }, [mobile, open, toggleSidebar]);
   (0, import_react.useEffect)(() => {
     if (!mobile || !open) return;
+    let timer = null;
+    const onDrawerPointerUp = (event) => {
+      if (event.pointerType !== "touch" && event.pointerType !== "pen") return;
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+      const drawer = document.querySelector(DRAWER_SELECTOR);
+      if (drawer === null || !drawer.contains(target)) return;
+      if (navTargetFor(target) === null) return;
+      if (timer !== null) return;
+      timer = window.setTimeout(() => {
+        timer = null;
+        const frame = document.querySelector('[data-mobile-nav="frame"]');
+        if (frame === null || frame.hasAttribute("data-sidebar-collapsed")) return;
+        const row = navTargetFor(target);
+        row?.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, view: window }));
+      }, 0);
+    };
+    document.addEventListener("pointerup", onDrawerPointerUp, true);
+    return () => {
+      if (timer !== null) window.clearTimeout(timer);
+      document.removeEventListener("pointerup", onDrawerPointerUp, true);
+    };
+  }, [mobile, open]);
+  (0, import_react.useEffect)(() => {
+    if (!mobile || !open) return;
     const onOutsideClick = (event) => {
       if (document.querySelector('[aria-modal="true"]') !== null) return;
       const target = event.target;
       if (target === null) return;
-      if (target.closest('[data-mobile-nav="toggle"]') !== null) return;
-      const drawer = document.querySelector('[data-mobile-nav="frame"] > :first-child');
+      if (target.closest(TOGGLE_SELECTOR) !== null) return;
+      if (isOverlayTap(target)) return;
+      const drawer = document.querySelector(DRAWER_SELECTOR);
       if (drawer !== null && drawer.contains(target)) return;
       toggleSidebar();
     };
