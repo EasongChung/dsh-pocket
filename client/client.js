@@ -1376,7 +1376,6 @@ var zh2 = {
   "confirm": "\u786E\u5B9A",
   "lanAddress": "\u5C40\u57DF\u7F51\u5730\u5740",
   "lanAddressAuto": "\u81EA\u52A8\uFF08\u63A8\u8350\uFF09",
-  "lanAddressHint": "\u9AD8\u7EA7\u9009\u9879\uFF1A\u4E00\u822C\u4E0D\u9700\u8981\u4FEE\u6539\uFF1B\u4F7F\u7528 Tailscale/VPN \u7B49\u8FDC\u7A0B\u8BBF\u95EE\u65F6\u53EF\u624B\u52A8\u9009\u62E9",
   "lanPin": "\u5C40\u57DF\u7F51\u8BBF\u95EE\u5BC6\u7801",
   "on": "\u5F00",
   "off": "\u5173",
@@ -1411,6 +1410,7 @@ var zh2 = {
   "namedSecurity": "\u56FA\u5B9A\u57DF\u540D\u957F\u671F\u66B4\u9732\u5728\u516C\u7F51\u3001\u66F4\u6613\u88AB\u626B\u63CF\uFF0C\u5EFA\u8BAE\u540C\u65F6\u8BBE\u7F6E\u81EA\u5B9A\u4E49\u5F3A\u5BC6\u7801\uFF08\u672C\u6A21\u5F0F\u516C\u7F51\u5BC6\u7801\u9ED8\u8BA4\u4E0D\u968F\u91CD\u542F\u8F6E\u6362\uFF09\u3002",
   "namedNeedCfg": "\u8BF7\u5148\u586B\u5199\u56FA\u5B9A\u57DF\u540D\u4E0E Tunnel Token",
   "namedRunningHint": "\u56FA\u5B9A\u57DF\u540D\uFF08Cloudflare \u547D\u540D\u96A7\u9053\uFF09\u2014\u2014\u5730\u5740\u4E0D\u968F\u91CD\u542F\u53D8\u5316",
+  "namedTakeEffect": "\u5DF2\u4FDD\u5B58\u56FA\u5B9A\u57DF\u540D\u914D\u7F6E\u2014\u2014\u9700\u5173\u95ED\u5E76\u91CD\u65B0\u5F00\u542F\u516C\u7F51\u8BBF\u95EE\u540E\u751F\u6548",
   "disclaimerTitle": "\u26A0\uFE0F \u5B89\u5168\u514D\u8D23\u58F0\u660E",
   "disclaimerBody": "\u5F00\u542F\u516C\u7F51 = \u628A\u672C\u673A DSH\uFF08\u80FD\u6267\u884C\u4EE3\u7801\uFF09\u66B4\u9732\u5230\u4E92\u8054\u7F51\u3002\u4EFB\u4F55\u4EBA\u62FF\u5230\u516C\u7F51\u94FE\u63A5\u548C\u5BC6\u7801\uFF0C\u90FD\u80FD\u8BBF\u95EE\u751A\u81F3\u64CD\u4F5C\u4F60\u7684\u7535\u8111\u3002\u8BF7\u786E\u8BA4\uFF1A\u2460 \u4F7F\u7528\u81EA\u5B9A\u4E49\u5F3A\u5BC6\u7801\u6216\u59A5\u5584\u4FDD\u7BA1\u81EA\u52A8\u5BC6\u7801\uFF1B\u2461 \u7528\u5B8C\u7ACB\u5373\u300C\u5173\u95ED\u516C\u7F51\u300D\uFF1B\u2462 \u516C\u53F8/\u6D89\u5BC6\u7F51\u7EDC\u8BF7\u5148\u786E\u8BA4\u5408\u89C4\u3002",
   "disclaimerAgree": "\u6211\u5DF2\u77E5\u60C5\uFF0C\u540C\u610F\u5F00\u542F",
@@ -1458,7 +1458,6 @@ var en2 = {
   "confirm": "Confirm",
   "lanAddress": "LAN address",
   "lanAddressAuto": "Auto (recommended)",
-  "lanAddressHint": "Advanced option: usually no change needed; select manually when accessing through Tailscale/VPN",
   "lanPin": "LAN access PIN",
   "on": "On",
   "off": "Off",
@@ -1493,6 +1492,7 @@ var en2 = {
   "namedSecurity": "A fixed domain is long-lived and easier to scan \u2014 set a strong custom PIN too (the public PIN is not rotated on restart in this mode).",
   "namedNeedCfg": "Set the fixed domain and Tunnel Token first",
   "namedRunningHint": "Fixed domain (Cloudflare named tunnel) \u2014 the URL no longer changes on restart",
+  "namedTakeEffect": "Fixed-domain config saved \u2014 turn public access off and on again to take effect",
   "disclaimerTitle": "\u26A0\uFE0F Security disclaimer",
   "disclaimerBody": "Enabling public access exposes this computer\u2019s DSH (which can execute code) to the internet. Anyone with the public link and PIN can reach \u2014 and operate \u2014 your computer. Please confirm: \u2460 use a strong custom PIN or keep the auto-generated one safe; \u2461 turn public access OFF as soon as you\u2019re done; \u2462 on a corporate/classified network, confirm compliance first.",
   "disclaimerAgree": "I understand and agree",
@@ -1771,6 +1771,16 @@ function PocketSettingsTab({ rpcCall, t }) {
   const tunnelStateStarted = tunnelState?.startedAt ?? null;
   const tunnelModeView = status?.tunnelConfig ?? { mode: "quick", hostname: "", tokenSet: false };
   const namedMode = tunnelModeView.mode === "named";
+  const namedActive = namedMode || tunnelCfg !== null;
+  const modeBtnStyle = (active) => ({
+    ...styles.btn,
+    height: 28,
+    padding: "0 12px",
+    fontSize: 12,
+    fontWeight: active ? 600 : 400,
+    background: active ? "var(--dsw-alias-button-primary-fill, var(--dsw-alias-brand-primary,#4f6ef7))" : "var(--dsw-alias-bg-layer-1,#fff)",
+    color: active ? "var(--dsw-alias-label-primary-foreground, #fff)" : "var(--dsw-alias-label-primary,inherit)"
+  });
   return (0, import_react2.createElement)(
     "div",
     { style: styles.card },
@@ -1869,7 +1879,6 @@ function PocketSettingsTab({ rpcCall, t }) {
             (status?.lanCandidates || []).map((ip) => (0, import_react2.createElement)("option", { key: ip, value: ip }, ip))
           )
         ),
-        (0, import_react2.createElement)("div", { style: { ...styles.muted, marginTop: 2 } }, t("lanAddressHint")),
         // 访问密码开关（issue #24）：默认开启；关闭后扫码直连（仅同一局域网设备可访问）
         (0, import_react2.createElement)(
           "div",
@@ -1916,78 +1925,84 @@ function PocketSettingsTab({ rpcCall, t }) {
           status?.publicPinCustom ? (0, import_react2.createElement)("div", { style: { marginTop: 2, fontSize: 11, color: "var(--dsw-alias-state-warn-primary,#b45309)" } }, t("pinCustomHint")) : null,
           namedMode ? (0, import_react2.createElement)("div", { style: { marginTop: 2, fontSize: 11, color: "var(--dsw-alias-state-warn-primary,#b45309)" } }, t("namedSecurity")) : null
         ) : null,
-        (0, import_react2.createElement)("button", { style: styles.btn, onClick: stopTunnel }, t("stopTunnel"))
+        (0, import_react2.createElement)("button", { style: styles.btn, onClick: stopTunnel }, t("stopTunnel")),
+        // 公网模式（issue #66）：仅在公网开启后才显示/可选
+        (0, import_react2.createElement)(
+          "div",
+          { style: { marginTop: 10 } },
+          (0, import_react2.createElement)(
+            "div",
+            { style: { display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" } },
+            (0, import_react2.createElement)("span", { style: { fontSize: 12, color: "var(--dsw-alias-label-secondary,#6b7280)" } }, t("tunnelMode")),
+            (0, import_react2.createElement)("button", {
+              style: modeBtnStyle(!namedActive),
+              onClick: namedMode ? switchToQuick : tunnelCfg ? () => setTunnelCfg(null) : void 0
+            }, t("modeQuick")),
+            (0, import_react2.createElement)("button", {
+              style: modeBtnStyle(namedActive),
+              onClick: () => setTunnelCfg(tunnelCfg ? null : { hostname: tunnelModeView.hostname ?? "", token: "", err: null })
+            }, t("modeNamed"))
+          ),
+          // 刚保存固定域名但当前连接仍是随机域名：需关闭后重新开启才生效
+          namedMode && /trycloudflare\.com/i.test(tunnelUrl ?? "") ? (0, import_react2.createElement)("div", { style: { marginTop: 4, fontSize: 11, color: "var(--dsw-alias-state-warn-primary,#b45309)" } }, t("namedTakeEffect")) : null,
+          // 固定域名：已保存的摘要 + 「修改」入口（非编辑态）
+          namedMode && !tunnelCfg ? (0, import_react2.createElement)(
+            "div",
+            { style: { marginTop: 6, fontSize: 12, color: "var(--dsw-alias-label-secondary,#6b7280)", lineHeight: 1.5 } },
+            fmt(t, "namedSummary", { host: tunnelModeView.hostname || "\u2014", token: tunnelModeView.tokenSet ? t("namedTokenSet") : t("namedTokenMissing") }),
+            (0, import_react2.createElement)("button", { style: { ...styles.btn, height: 26, padding: "0 10px", fontSize: 12, marginLeft: 8 }, onClick: () => setTunnelCfg({ hostname: tunnelModeView.hostname ?? "", token: "", err: null }) }, t("namedEdit")),
+            (0, import_react2.createElement)("div", { style: { ...styles.muted, marginTop: 4 } }, t("namedHow")),
+            !tunnelModeView.tokenSet || !tunnelModeView.hostname ? (0, import_react2.createElement)("div", { style: { marginTop: 2, fontSize: 12, color: "var(--dsw-alias-state-error-primary,#dc2626)" } }, t("namedNeedCfg")) : null
+          ) : null,
+          // 固定域名：编辑表单（域名 + Tunnel Token，Token 留空保持不变）
+          tunnelCfg ? (0, import_react2.createElement)(
+            "div",
+            { style: { marginTop: 8, fontSize: 12, color: "var(--dsw-alias-label-secondary,#6b7280)", lineHeight: 1.6 } },
+            (0, import_react2.createElement)(
+              "div",
+              null,
+              t("namedHostnameLabel"),
+              (0, import_react2.createElement)("input", {
+                style: { margin: "4px 0 0 6px", padding: "4px 8px", fontSize: 13, border: "1px solid var(--dsw-alias-border-l2,#d1d5db)", borderRadius: 6, outline: "none", width: 200 },
+                placeholder: "pocket.example.com",
+                value: tunnelCfg.hostname ?? "",
+                autoFocus: true,
+                onChange: (e) => setTunnelCfg((c) => ({ ...c, hostname: e.target.value.trim(), err: null })),
+                onKeyDown: (e) => {
+                  if (e.key === "Enter") saveNamedTunnel();
+                  if (e.key === "Escape") setTunnelCfg(null);
+                }
+              })
+            ),
+            (0, import_react2.createElement)(
+              "div",
+              { style: { marginTop: 6 } },
+              t("namedTokenLabel"),
+              (0, import_react2.createElement)("input", {
+                style: { margin: "4px 0 0 6px", padding: "4px 8px", fontSize: 13, border: "1px solid var(--dsw-alias-border-l2,#d1d5db)", borderRadius: 6, outline: "none", width: 240, fontFamily: "ui-monospace,Menlo,monospace" },
+                type: "password",
+                value: tunnelCfg.token ?? "",
+                onChange: (e) => setTunnelCfg((c) => ({ ...c, token: e.target.value.trim(), err: null })),
+                onKeyDown: (e) => {
+                  if (e.key === "Enter") saveNamedTunnel();
+                  if (e.key === "Escape") setTunnelCfg(null);
+                }
+              })
+            ),
+            (0, import_react2.createElement)(
+              "div",
+              { style: { marginTop: 6, display: "flex", gap: 8 } },
+              (0, import_react2.createElement)("button", { style: { ...styles.btn, height: 26, padding: "0 10px", fontSize: 12 }, onClick: saveNamedTunnel }, t("save")),
+              (0, import_react2.createElement)("button", { style: { ...styles.btn, height: 26, padding: "0 10px", fontSize: 12 }, onClick: () => setTunnelCfg(null) }, t("cancel"))
+            ),
+            (0, import_react2.createElement)("div", { style: { ...styles.muted, marginTop: 6 } }, t("namedHow")),
+            (0, import_react2.createElement)("div", { style: { marginTop: 2, fontSize: 11, color: "var(--dsw-alias-state-warn-primary,#b45309)", lineHeight: 1.5 } }, t("namedSecurity")),
+            tunnelCfg.err ? (0, import_react2.createElement)("div", { style: { color: "var(--dsw-alias-state-error-primary,#dc2626)", marginTop: 4 } }, tunnelCfg.err) : null
+          ) : null
+        )
       ) : (0, import_react2.createElement)(
         "div",
         null,
-        // 公网模式（issue #66）：随机域名（默认）/ 固定域名（命名隧道）
-        (0, import_react2.createElement)(
-          "div",
-          { style: { display: "flex", alignItems: "center", gap: 8, marginTop: 8, flexWrap: "wrap" } },
-          (0, import_react2.createElement)("span", { style: { fontSize: 12, color: "var(--dsw-alias-label-secondary,#6b7280)" } }, t("tunnelMode")),
-          (0, import_react2.createElement)("button", {
-            style: { ...styles.btn, height: 28, padding: "0 12px", fontSize: 12, fontWeight: !namedMode ? 600 : 400, background: !namedMode ? "var(--dsw-alias-button-primary-fill, var(--dsw-alias-brand-primary,#4f6ef7))" : "var(--dsw-alias-bg-layer-1,#fff)", color: !namedMode ? "var(--dsw-alias-label-primary-foreground, #fff)" : "var(--dsw-alias-label-primary,inherit)" },
-            onClick: namedMode ? switchToQuick : void 0
-          }, t("modeQuick")),
-          (0, import_react2.createElement)("button", {
-            style: { ...styles.btn, height: 28, padding: "0 12px", fontSize: 12, fontWeight: namedMode ? 600 : 400, background: namedMode ? "var(--dsw-alias-button-primary-fill, var(--dsw-alias-brand-primary,#4f6ef7))" : "var(--dsw-alias-bg-layer-1,#fff)", color: namedMode ? "var(--dsw-alias-label-primary-foreground, #fff)" : "var(--dsw-alias-label-primary,inherit)" },
-            onClick: () => setTunnelCfg(tunnelCfg ? null : { hostname: tunnelModeView.hostname ?? "", token: "", err: null })
-          }, t("modeNamed"))
-        ),
-        // 固定域名：已保存的摘要 + 「修改」入口（非编辑态）
-        namedMode && !tunnelCfg ? (0, import_react2.createElement)(
-          "div",
-          { style: { marginTop: 6, fontSize: 12, color: "var(--dsw-alias-label-secondary,#6b7280)", lineHeight: 1.5 } },
-          fmt(t, "namedSummary", { host: tunnelModeView.hostname || "\u2014", token: tunnelModeView.tokenSet ? t("namedTokenSet") : t("namedTokenMissing") }),
-          (0, import_react2.createElement)("button", { style: { ...styles.btn, height: 26, padding: "0 10px", fontSize: 12, marginLeft: 8 }, onClick: () => setTunnelCfg({ hostname: tunnelModeView.hostname ?? "", token: "", err: null }) }, t("namedEdit")),
-          (0, import_react2.createElement)("div", { style: { ...styles.muted, marginTop: 4 } }, t("namedHow")),
-          !tunnelModeView.tokenSet || !tunnelModeView.hostname ? (0, import_react2.createElement)("div", { style: { marginTop: 2, fontSize: 12, color: "var(--dsw-alias-state-error-primary,#dc2626)" } }, t("namedNeedCfg")) : null
-        ) : null,
-        // 固定域名：编辑表单（域名 + Tunnel Token，Token 留空保持不变）
-        tunnelCfg ? (0, import_react2.createElement)(
-          "div",
-          { style: { marginTop: 8, fontSize: 12, color: "var(--dsw-alias-label-secondary,#6b7280)", lineHeight: 1.6 } },
-          (0, import_react2.createElement)(
-            "div",
-            null,
-            t("namedHostnameLabel"),
-            (0, import_react2.createElement)("input", {
-              style: { margin: "4px 0 0 6px", padding: "4px 8px", fontSize: 13, border: "1px solid var(--dsw-alias-border-l2,#d1d5db)", borderRadius: 6, outline: "none", width: 200 },
-              placeholder: "pocket.example.com",
-              value: tunnelCfg.hostname ?? "",
-              autoFocus: true,
-              onChange: (e) => setTunnelCfg((c) => ({ ...c, hostname: e.target.value.trim(), err: null })),
-              onKeyDown: (e) => {
-                if (e.key === "Enter") saveNamedTunnel();
-                if (e.key === "Escape") setTunnelCfg(null);
-              }
-            })
-          ),
-          (0, import_react2.createElement)(
-            "div",
-            { style: { marginTop: 6 } },
-            t("namedTokenLabel"),
-            (0, import_react2.createElement)("input", {
-              style: { margin: "4px 0 0 6px", padding: "4px 8px", fontSize: 13, border: "1px solid var(--dsw-alias-border-l2,#d1d5db)", borderRadius: 6, outline: "none", width: 240, fontFamily: "ui-monospace,Menlo,monospace" },
-              type: "password",
-              value: tunnelCfg.token ?? "",
-              onChange: (e) => setTunnelCfg((c) => ({ ...c, token: e.target.value.trim(), err: null })),
-              onKeyDown: (e) => {
-                if (e.key === "Enter") saveNamedTunnel();
-                if (e.key === "Escape") setTunnelCfg(null);
-              }
-            })
-          ),
-          (0, import_react2.createElement)(
-            "div",
-            { style: { marginTop: 6, display: "flex", gap: 8 } },
-            (0, import_react2.createElement)("button", { style: { ...styles.btn, height: 26, padding: "0 10px", fontSize: 12 }, onClick: saveNamedTunnel }, t("save")),
-            (0, import_react2.createElement)("button", { style: { ...styles.btn, height: 26, padding: "0 10px", fontSize: 12 }, onClick: () => setTunnelCfg(null) }, t("cancel"))
-          ),
-          (0, import_react2.createElement)("div", { style: { ...styles.muted, marginTop: 6 } }, t("namedHow")),
-          (0, import_react2.createElement)("div", { style: { marginTop: 2, fontSize: 11, color: "var(--dsw-alias-state-warn-primary,#b45309)", lineHeight: 1.5 } }, t("namedSecurity")),
-          tunnelCfg.err ? (0, import_react2.createElement)("div", { style: { color: "var(--dsw-alias-state-error-primary,#dc2626)", marginTop: 4 } }, tunnelCfg.err) : null
-        ) : null,
         (0, import_react2.createElement)("button", { style: { ...styles.primary, margin: "8px 0" }, onClick: startTunnel, disabled: busy || tunnelStarting }, busy ? t("opening") : t("enable")),
         tunnelStarting ? (0, import_react2.createElement)(
           "div",

@@ -307,6 +307,14 @@ function PocketSettingsTab({ rpcCall, t }) {
   // 公网模式视图（issue #66）：{ mode, hostname, tokenSet }
   const tunnelModeView = status?.tunnelConfig ?? { mode: 'quick', hostname: '', tokenSet: false };
   const namedMode = tunnelModeView.mode === 'named';
+  // 模式按钮选中态高亮：固定域名模式本身，或正在编辑固定域名配置，都视为「选中」
+  const namedActive = namedMode || tunnelCfg !== null;
+  const modeBtnStyle = (active) => ({
+    ...styles.btn, height: 28, padding: '0 12px', fontSize: 12,
+    fontWeight: active ? 600 : 400,
+    background: active ? 'var(--dsw-alias-button-primary-fill, var(--dsw-alias-brand-primary,#4f6ef7))' : 'var(--dsw-alias-bg-layer-1,#fff)',
+    color: active ? 'var(--dsw-alias-label-primary-foreground, #fff)' : 'var(--dsw-alias-label-primary,inherit)',
+  });
 
   return h('div', { style: styles.card },
     h('div', { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 } },
@@ -394,7 +402,6 @@ function PocketSettingsTab({ rpcCall, t }) {
             (status?.lanCandidates || []).map((ip) => h('option', { key: ip, value: ip }, ip)),
             ),
           ),
-          h('div', { style: { ...styles.muted, marginTop: 2 } }, t('lanAddressHint')),
           // 访问密码开关（issue #24）：默认开启；关闭后扫码直连（仅同一局域网设备可访问）
           h('div', { style: { display: 'flex', alignItems: 'center', gap: 8, marginTop: 8 } },
             h('span', { style: { fontSize: 12, color: 'var(--dsw-alias-label-secondary,#6b7280)' } }, t('lanPin')),
@@ -440,58 +447,62 @@ function PocketSettingsTab({ rpcCall, t }) {
                 ))
             : null,
           h('button', { style: styles.btn, onClick: stopTunnel }, t('stopTunnel')),
+          // 公网模式（issue #66）：仅在公网开启后才显示/可选
+          h('div', { style: { marginTop: 10 } },
+            h('div', { style: { display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' } },
+              h('span', { style: { fontSize: 12, color: 'var(--dsw-alias-label-secondary,#6b7280)' } }, t('tunnelMode')),
+              h('button', {
+                style: modeBtnStyle(!namedActive),
+                onClick: namedMode ? switchToQuick : (tunnelCfg ? () => setTunnelCfg(null) : undefined),
+              }, t('modeQuick')),
+              h('button', {
+                style: modeBtnStyle(namedActive),
+                onClick: () => setTunnelCfg(tunnelCfg ? null : { hostname: tunnelModeView.hostname ?? '', token: '', err: null }),
+              }, t('modeNamed')),
+            ),
+            // 刚保存固定域名但当前连接仍是随机域名：需关闭后重新开启才生效
+            namedMode && /trycloudflare\.com/i.test(tunnelUrl ?? '') ? h('div', { style: { marginTop: 4, fontSize: 11, color: 'var(--dsw-alias-state-warn-primary,#b45309)' } }, t('namedTakeEffect')) : null,
+            // 固定域名：已保存的摘要 + 「修改」入口（非编辑态）
+            namedMode && !tunnelCfg ? h('div', { style: { marginTop: 6, fontSize: 12, color: 'var(--dsw-alias-label-secondary,#6b7280)', lineHeight: 1.5 } },
+              fmt(t, 'namedSummary', { host: tunnelModeView.hostname || '—', token: tunnelModeView.tokenSet ? t('namedTokenSet') : t('namedTokenMissing') }),
+              h('button', { style: { ...styles.btn, height: 26, padding: '0 10px', fontSize: 12, marginLeft: 8 }, onClick: () => setTunnelCfg({ hostname: tunnelModeView.hostname ?? '', token: '', err: null }) }, t('namedEdit')),
+              h('div', { style: { ...styles.muted, marginTop: 4 } }, t('namedHow')),
+              !tunnelModeView.tokenSet || !tunnelModeView.hostname ? h('div', { style: { marginTop: 2, fontSize: 12, color: 'var(--dsw-alias-state-error-primary,#dc2626)' } }, t('namedNeedCfg')) : null,
+            ) : null,
+            // 固定域名：编辑表单（域名 + Tunnel Token，Token 留空保持不变）
+            tunnelCfg ? h('div', { style: { marginTop: 8, fontSize: 12, color: 'var(--dsw-alias-label-secondary,#6b7280)', lineHeight: 1.6 } },
+              h('div', null,
+                t('namedHostnameLabel'),
+                h('input', {
+                  style: { margin: '4px 0 0 6px', padding: '4px 8px', fontSize: 13, border: '1px solid var(--dsw-alias-border-l2,#d1d5db)', borderRadius: 6, outline: 'none', width: 200 },
+                  placeholder: 'pocket.example.com',
+                  value: tunnelCfg.hostname ?? '',
+                  autoFocus: true,
+                  onChange: (e) => setTunnelCfg((c) => ({ ...c, hostname: e.target.value.trim(), err: null })),
+                  onKeyDown: (e) => { if (e.key === 'Enter') saveNamedTunnel(); if (e.key === 'Escape') setTunnelCfg(null); },
+                }),
+              ),
+              h('div', { style: { marginTop: 6 } },
+                t('namedTokenLabel'),
+                h('input', {
+                  style: { margin: '4px 0 0 6px', padding: '4px 8px', fontSize: 13, border: '1px solid var(--dsw-alias-border-l2,#d1d5db)', borderRadius: 6, outline: 'none', width: 240, fontFamily: 'ui-monospace,Menlo,monospace' },
+                  type: 'password',
+                  value: tunnelCfg.token ?? '',
+                  onChange: (e) => setTunnelCfg((c) => ({ ...c, token: e.target.value.trim(), err: null })),
+                  onKeyDown: (e) => { if (e.key === 'Enter') saveNamedTunnel(); if (e.key === 'Escape') setTunnelCfg(null); },
+                }),
+              ),
+              h('div', { style: { marginTop: 6, display: 'flex', gap: 8 } },
+                h('button', { style: { ...styles.btn, height: 26, padding: '0 10px', fontSize: 12 }, onClick: saveNamedTunnel }, t('save')),
+                h('button', { style: { ...styles.btn, height: 26, padding: '0 10px', fontSize: 12 }, onClick: () => setTunnelCfg(null) }, t('cancel')),
+              ),
+              h('div', { style: { ...styles.muted, marginTop: 6 } }, t('namedHow')),
+              h('div', { style: { marginTop: 2, fontSize: 11, color: 'var(--dsw-alias-state-warn-primary,#b45309)', lineHeight: 1.5 } }, t('namedSecurity')),
+              tunnelCfg.err ? h('div', { style: { color: 'var(--dsw-alias-state-error-primary,#dc2626)', marginTop: 4 } }, tunnelCfg.err) : null,
+            ) : null,
+          ),
         )
         : h('div', null,
-          // 公网模式（issue #66）：随机域名（默认）/ 固定域名（命名隧道）
-          h('div', { style: { display: 'flex', alignItems: 'center', gap: 8, marginTop: 8, flexWrap: 'wrap' } },
-            h('span', { style: { fontSize: 12, color: 'var(--dsw-alias-label-secondary,#6b7280)' } }, t('tunnelMode')),
-            h('button', {
-              style: { ...styles.btn, height: 28, padding: '0 12px', fontSize: 12, fontWeight: !namedMode ? 600 : 400, background: !namedMode ? 'var(--dsw-alias-button-primary-fill, var(--dsw-alias-brand-primary,#4f6ef7))' : 'var(--dsw-alias-bg-layer-1,#fff)', color: !namedMode ? 'var(--dsw-alias-label-primary-foreground, #fff)' : 'var(--dsw-alias-label-primary,inherit)' },
-              onClick: namedMode ? switchToQuick : undefined,
-            }, t('modeQuick')),
-            h('button', {
-              style: { ...styles.btn, height: 28, padding: '0 12px', fontSize: 12, fontWeight: namedMode ? 600 : 400, background: namedMode ? 'var(--dsw-alias-button-primary-fill, var(--dsw-alias-brand-primary,#4f6ef7))' : 'var(--dsw-alias-bg-layer-1,#fff)', color: namedMode ? 'var(--dsw-alias-label-primary-foreground, #fff)' : 'var(--dsw-alias-label-primary,inherit)' },
-              onClick: () => setTunnelCfg(tunnelCfg ? null : { hostname: tunnelModeView.hostname ?? '', token: '', err: null }),
-            }, t('modeNamed')),
-          ),
-          // 固定域名：已保存的摘要 + 「修改」入口（非编辑态）
-          namedMode && !tunnelCfg ? h('div', { style: { marginTop: 6, fontSize: 12, color: 'var(--dsw-alias-label-secondary,#6b7280)', lineHeight: 1.5 } },
-            fmt(t, 'namedSummary', { host: tunnelModeView.hostname || '—', token: tunnelModeView.tokenSet ? t('namedTokenSet') : t('namedTokenMissing') }),
-            h('button', { style: { ...styles.btn, height: 26, padding: '0 10px', fontSize: 12, marginLeft: 8 }, onClick: () => setTunnelCfg({ hostname: tunnelModeView.hostname ?? '', token: '', err: null }) }, t('namedEdit')),
-            h('div', { style: { ...styles.muted, marginTop: 4 } }, t('namedHow')),
-            !tunnelModeView.tokenSet || !tunnelModeView.hostname ? h('div', { style: { marginTop: 2, fontSize: 12, color: 'var(--dsw-alias-state-error-primary,#dc2626)' } }, t('namedNeedCfg')) : null,
-          ) : null,
-          // 固定域名：编辑表单（域名 + Tunnel Token，Token 留空保持不变）
-          tunnelCfg ? h('div', { style: { marginTop: 8, fontSize: 12, color: 'var(--dsw-alias-label-secondary,#6b7280)', lineHeight: 1.6 } },
-            h('div', null,
-              t('namedHostnameLabel'),
-              h('input', {
-                style: { margin: '4px 0 0 6px', padding: '4px 8px', fontSize: 13, border: '1px solid var(--dsw-alias-border-l2,#d1d5db)', borderRadius: 6, outline: 'none', width: 200 },
-                placeholder: 'pocket.example.com',
-                value: tunnelCfg.hostname ?? '',
-                autoFocus: true,
-                onChange: (e) => setTunnelCfg((c) => ({ ...c, hostname: e.target.value.trim(), err: null })),
-                onKeyDown: (e) => { if (e.key === 'Enter') saveNamedTunnel(); if (e.key === 'Escape') setTunnelCfg(null); },
-              }),
-            ),
-            h('div', { style: { marginTop: 6 } },
-              t('namedTokenLabel'),
-              h('input', {
-                style: { margin: '4px 0 0 6px', padding: '4px 8px', fontSize: 13, border: '1px solid var(--dsw-alias-border-l2,#d1d5db)', borderRadius: 6, outline: 'none', width: 240, fontFamily: 'ui-monospace,Menlo,monospace' },
-                type: 'password',
-                value: tunnelCfg.token ?? '',
-                onChange: (e) => setTunnelCfg((c) => ({ ...c, token: e.target.value.trim(), err: null })),
-                onKeyDown: (e) => { if (e.key === 'Enter') saveNamedTunnel(); if (e.key === 'Escape') setTunnelCfg(null); },
-              }),
-            ),
-            h('div', { style: { marginTop: 6, display: 'flex', gap: 8 } },
-              h('button', { style: { ...styles.btn, height: 26, padding: '0 10px', fontSize: 12 }, onClick: saveNamedTunnel }, t('save')),
-              h('button', { style: { ...styles.btn, height: 26, padding: '0 10px', fontSize: 12 }, onClick: () => setTunnelCfg(null) }, t('cancel')),
-            ),
-            h('div', { style: { ...styles.muted, marginTop: 6 } }, t('namedHow')),
-            h('div', { style: { marginTop: 2, fontSize: 11, color: 'var(--dsw-alias-state-warn-primary,#b45309)', lineHeight: 1.5 } }, t('namedSecurity')),
-            tunnelCfg.err ? h('div', { style: { color: 'var(--dsw-alias-state-error-primary,#dc2626)', marginTop: 4 } }, tunnelCfg.err) : null,
-          ) : null,
           h('button', { style: { ...styles.primary, margin: '8px 0' }, onClick: startTunnel, disabled: busy || tunnelStarting }, busy ? t('opening') : t('enable')),
           tunnelStarting
             ? h('div', { style: { marginTop: 4, fontSize: 12, color: 'var(--dsw-alias-label-secondary,#6b7280)' } },
