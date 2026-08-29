@@ -1214,6 +1214,51 @@ var MOBILE_CSS = `
   [data-mobile-nav="drawer-actions"] {
     display: none !important;
   }
+  /* \u684C\u9762\u7AEF\u6C38\u8FDC\u4E0D\u9700\u8981\u300C\u26F6 \u653E\u5927\u8F93\u5165\u300D\u6309\u94AE\uFF08composer \u5DF2\u7ECF\u6709\u5B8C\u6574\u5DE5\u5177\u884C\uFF09 */
+  [data-mobile-nav="composer-fullscreen"] {
+    display: none !important;
+  }
+}
+
+/* ---------- \u653E\u5927\u8F93\u5165\uFF08issue #23\uFF09 ----------
+   \u7A84\u5C4F\u9ED8\u8BA4\u9690\u85CF\u63D2\u4EF6\u6CE8\u518C\u5230 conversation.input.* slot \u7684 UI\uFF08\u4EC5\u7559\u5B98\u65B9 resident
+   chrome\uFF09\uFF0C\u70B9\u300C\u26F6\u300D\u6309\u94AE\u628A composer \u5361\u7247\u56FA\u5B9A\u5230\u5168\u5C4F\u540E\u6240\u6709\u63D2\u4EF6 UI \u6062\u590D\u663E\u793A\u2014\u2014
+   \u65B0\u63D2\u4EF6\u96F6\u9002\u914D\u3002
+   \u5B9E\u73B0\u8BF4\u660E\uFF1A\u5F53\u524D dsh 0.1.1 \u6CA1\u628A input slot \u6E32\u67D3\u6210 [data-slot] \u5305\u88C5\uFF080.1.2+ \u624D\u6709\uFF09\uFF0C
+   \u6240\u4EE5\u8FD9\u91CC\u7528\u300C\u767D\u540D\u5355\u300D\u53CD\u9009\uFF1AmobileApply \u6CE8\u518C\u7684 mobile \u81EA\u8EAB\u8282\u70B9\u52A0
+   data-mobile-nav="composer-fullscreen" \u4E0D\u88AB\u9690\u85CF\uFF1B\u5176\u5B83\u63D2\u4EF6 UI \u9690\u85CF\u3002 */
+@media (max-width: 1023px) {
+  /* \u9ED8\u8BA4\uFF08\u975E\u5168\u5C4F\uFF09\uFF1A\u9690\u85CF input slot \u5BB9\u5668\u4E0B\u7684\u6240\u6709\u76F4\u63A5\u5B50\u5143\u7D20\uFF08\u5305\u542B\u63D2\u4EF6\u548C\u5B98\u65B9\uFF09
+     \u2014\u2014\u5B98\u65B9\u81EA\u5DF1\u5982\u679C\u60F3\u5728\u7A84\u5C4F\u4E5F\u9732\u51FA\uFF0C\u6CE8 input slot \u65F6\u52A0 data-mobile-nav-keep="1" */
+  [data-dsh-pocket-composer-fullscreen]:not([data-dsh-pocket-composer-fullscreen="1"])
+    [class$="_card"]:has(textarea) [data-slot^="conversation.input."] > :not([data-mobile-nav-keep]),
+  [data-dsh-pocket-composer-fullscreen]:not([data-dsh-pocket-composer-fullscreen="1"])
+    [class$="_card"]:has(textarea) [data-slot^="conversation.input."]:empty {
+    display: none !important;
+  }
+  /* \u653E\u5927\u6309\u94AE\uFF1A\u5E38\u9A7B\u5728 conversation.input.right slot \u65C1\uFF0C\u684C\u9762\u7AEF\u5DF2\u88AB\u4E0A\u9762\u89C4\u5219\u9690\u85CF */
+  [data-mobile-nav="composer-fullscreen"] {
+    display: inline-flex;
+  }
+  /* \u5168\u5C4F\u6A21\u5F0F\uFF1Acomposer \u5361\u7247\u56FA\u5B9A\u5230\u89C6\u53E3\uFF0Ctextarea \u62C9\u9AD8\uFF0C\u5DE5\u5177\u884C\u53EF\u6362\u884C */
+  [data-dsh-pocket-composer-fullscreen="1"] [class$="_card"]:has(textarea) {
+    position: fixed !important;
+    inset: 0 !important;
+    z-index: 9999 !important;
+    border-radius: 0 !important;
+    margin: 0 !important;
+    height: 100dvh !important;
+    display: flex !important;
+    flex-direction: column !important;
+  }
+  [data-dsh-pocket-composer-fullscreen="1"] [class$="_card"]:has(textarea) textarea {
+    flex: 1 1 auto !important;
+    min-height: 50dvh !important;
+    max-height: none !important;
+  }
+  [data-dsh-pocket-composer-fullscreen="1"] [class$="_card"]:has(textarea) [data-slot^="conversation.input."] {
+    flex-wrap: wrap !important;
+  }
 }
 `;
 
@@ -1439,6 +1484,12 @@ function mobileApply(ctx) {
       toggleSidebar: () => ctx.layout.toggleSidebar()
     })
   }, MobileNavToggle));
+  ctx.slots.inject("conversation.input.right", () => ctx.slots.register({
+    name: "conversation.input.right",
+    id: "mobile-composer-fullscreen",
+    order: 100,
+    locale: NS
+  }, MobileComposerFullscreen));
   ctx.slots.inject("shell.overlay", () => ctx.slots.register({
     name: "shell.overlay",
     id: "mobile-nav-overlay",

@@ -272,6 +272,16 @@ export function mobileApply(ctx): void {
     }),
   }, MobileNavToggle))
 
+  // 「⛶ 放大输入」按钮（issue #23）：注册到 conversation.input.right（发送键旁）
+  // ——桌面端由 mobile.css.ts 隐藏（min-width:1024px）。点按切换 body 上的
+  // data-dsh-pocket-composer-fullscreen 标记，由 CSS 把 composer 卡片全屏化。
+  ctx.slots.inject('conversation.input.right', () => ctx.slots.register({
+    name: 'conversation.input.right',
+    id: 'mobile-composer-fullscreen',
+    order: 100,
+    locale: NS,
+  }, MobileComposerFullscreen))
+
   ctx.slots.inject('shell.overlay', () => ctx.slots.register({
     name: 'shell.overlay',
     id: 'mobile-nav-overlay',

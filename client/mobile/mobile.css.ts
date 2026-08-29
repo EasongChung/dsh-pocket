@@ -886,5 +886,50 @@ export const MOBILE_CSS = `
   [data-mobile-nav="drawer-actions"] {
     display: none !important;
   }
+  /* 桌面端永远不需要「⛶ 放大输入」按钮（composer 已经有完整工具行） */
+  [data-mobile-nav="composer-fullscreen"] {
+    display: none !important;
+  }
+}
+
+/* ---------- 放大输入（issue #23） ----------
+   窄屏默认隐藏插件注册到 conversation.input.* slot 的 UI（仅留官方 resident
+   chrome），点「⛶」按钮把 composer 卡片固定到全屏后所有插件 UI 恢复显示——
+   新插件零适配。
+   实现说明：当前 dsh 0.1.1 没把 input slot 渲染成 [data-slot] 包装（0.1.2+ 才有），
+   所以这里用「白名单」反选：mobileApply 注册的 mobile 自身节点加
+   data-mobile-nav="composer-fullscreen" 不被隐藏；其它插件 UI 隐藏。 */
+@media (max-width: 1023px) {
+  /* 默认（非全屏）：隐藏 input slot 容器下的所有直接子元素（包含插件和官方）
+     ——官方自己如果想在窄屏也露出，注 input slot 时加 data-mobile-nav-keep="1" */
+  [data-dsh-pocket-composer-fullscreen]:not([data-dsh-pocket-composer-fullscreen="1"])
+    [class$="_card"]:has(textarea) [data-slot^="conversation.input."] > :not([data-mobile-nav-keep]),
+  [data-dsh-pocket-composer-fullscreen]:not([data-dsh-pocket-composer-fullscreen="1"])
+    [class$="_card"]:has(textarea) [data-slot^="conversation.input."]:empty {
+    display: none !important;
+  }
+  /* 放大按钮：常驻在 conversation.input.right slot 旁，桌面端已被上面规则隐藏 */
+  [data-mobile-nav="composer-fullscreen"] {
+    display: inline-flex;
+  }
+  /* 全屏模式：composer 卡片固定到视口，textarea 拉高，工具行可换行 */
+  [data-dsh-pocket-composer-fullscreen="1"] [class$="_card"]:has(textarea) {
+    position: fixed !important;
+    inset: 0 !important;
+    z-index: 9999 !important;
+    border-radius: 0 !important;
+    margin: 0 !important;
+    height: 100dvh !important;
+    display: flex !important;
+    flex-direction: column !important;
+  }
+  [data-dsh-pocket-composer-fullscreen="1"] [class$="_card"]:has(textarea) textarea {
+    flex: 1 1 auto !important;
+    min-height: 50dvh !important;
+    max-height: none !important;
+  }
+  [data-dsh-pocket-composer-fullscreen="1"] [class$="_card"]:has(textarea) [data-slot^="conversation.input."] {
+    flex-wrap: wrap !important;
+  }
 }
 `
