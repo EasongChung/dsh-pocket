@@ -914,6 +914,75 @@ test('upstreamPathWithLaunchToken（issue #77）：首屏根路径补 token，�
     `/?dsh-pocket-auth=1&token=${TOK}`, '带强制标记时无视旧 cookie');
 });
 
+// ---------- 清理历史遗留的 dsh-desktop-* 参数（issue #75） ----------
+
+test('stripDesktopMarkers（issue #75）：URL 上的 dsh-desktop-* 参数全部清掉，其余原样', async () => {
+  const { stripDesktopMarkers } = await import('../lib/proxy.mjs');
+  // 2.1.1 及更早注入、被 history.replaceState 写进 URL 的那两个
+  assert.equal(
+    stripDesktopMarkers('/?dsh-desktop-mode=compatibility&dsh-desktop-platform=win32'),
+    '/',
+    '清掉注入的 mode/platform',
+  );
+  // 只清 dsh-desktop- 前缀，别的参数一个都不能动
+  assert.equal(
+    stripDesktopMarkers('/?a=1&dsh-desktop-mode=compatibility&b=2'),
+    '/?a=1&b=2',
+    '保留其他 query 参数',
+  );
+  assert.equal(
+    stripDesktopMarkers('/api/events.mux?dsh-desktop-material=mica&x=9'),
+    '/api/events.mux?x=9',
+    'API / WS 握手路径同样清理（不只对 GET / 生效）',
+  );
+  // 五个标记齐备也要清——上游 decideDesktopBrowserAccess 见到前缀就 403
+  assert.equal(
+    stripDesktopMarkers(
+      '/?dsh-desktop-mode=compatibility&dsh-desktop-platform=darwin&dsh-desktop-material=mica&dsh-desktop-version=2.0.3&dsh-desktop-mica=1',
+    ),
+    '/',
+    '整组标记一律清掉',
+  );
+  // 无该前缀参数时原样返回（不重写 URL，避免把 %20 之类改写得不一样）
+  assert.equal(stripDesktopMarkers('/?x=1'), '/?x=1', '无目标参数时原样返回');
+  assert.equal(stripDesktopMarkers('/'), '/', '无 query 时原样返回');
+  assert.equal(stripDesktopMarkers(undefined), undefined, '非法输入不抛错');
+});
+
+test('端到端（issue #75）：代理转发前清掉 dsh-desktop-*，上游拿到的是干净路径', async () => {
+  const http = await import('node:http');
+  const seen = [];
+  const upstream = http.createServer((req, res) => {
+    seen.push({ method: req.method, url: req.url });
+    res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
+    res.end('<html><head></head><body>ok</body></html>');
+  });
+  await new Promise((r) => upstream.listen(0, '127.0.0.1', r));
+  const { createPocketProxy } = await import('../lib/proxy.mjs');
+  const proxy = await createPocketProxy({
+    port: 0,
+    host: '127.0.0.1',
+    upstream: { host: '127.0.0.1', port: upstream.address().port },
+  });
+  try {
+    for (const p of [
+      '/?dsh-desktop-mode=compatibility&dsh-desktop-platform=win32',
+      '/api/events.mux?dsh-desktop-material=mica',
+    ]) {
+      const res = await fetch(`http://127.0.0.1:${proxy.port}${p}`);
+      await res.text();
+    }
+    assert.deepEqual(
+      seen.map((s) => s.url),
+      ['/', '/api/events.mux'],
+      '上游收到的路径里不应再有 dsh-desktop-* 参数',
+    );
+  } finally {
+    await proxy.close();
+    await new Promise((r) => upstream.close(r));
+  }
+});
+
 test('端到端（issue #77）：代理自动补 token 完成会话握手——首屏 303 拿 cookie，之后正常返回首页', async () => {
   const http = await import('node:http');
   const TOK = 'launch-token-abc123';
