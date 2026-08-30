@@ -487,11 +487,8 @@ function PocketSettingsTab({ rpcCall, t }) {
       tunnelUrl
         ? h('div', null,
           qrArea(status.tunnelQr, tunnelUrl, namedMode ? t('namedRunningHint') : t('wanHint')),
-          // 防钓鱼 / 别收藏（issue #82）：链接 ephemeral 提示 + 本次会话指纹交叉核对
+          // 防钓鱼 / 别收藏（issue #82）：公网链接仅本次有效、勿收藏提示
           h('div', { style: { marginTop: 8, fontSize: 12, lineHeight: 1.5, borderLeft: '4px solid var(--dsw-alias-state-warn-primary,#b45309)', background: 'var(--dsw-alias-bg-layer-2,#f3f4f6)', borderRadius: 8, padding: '8px 10px' } }, t('wanEphemeralWarn')),
-          status?.sessionFingerprint ? h('div', { style: { marginTop: 8, fontSize: 12, color: 'var(--dsw-alias-label-secondary,#6b7280)', lineHeight: 1.5 } },
-            fmt(t, 'wanSessionFp', { fp: status.sessionFingerprint }),
-          ) : null,
           // 地址模式行（随机/固定；固定域名选中或编辑时高亮）
           row(t('modeLabel'),
             h('span', { style: { display: 'inline-flex', gap: 6 } },

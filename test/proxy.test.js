@@ -4,7 +4,6 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer, request as httpRequest } from 'node:http';
 import { connect } from 'node:net';
-import { createHash } from 'node:crypto';
 import { WebSocket, WebSocketServer } from 'ws';
 
 import { createPocketProxy } from '../lib/proxy.mjs';
@@ -362,8 +361,10 @@ test('HTML 注入：非安全上下文 polyfill 只注入 HTML 文档，不碰 J
   }
 });
 
-test('防钓鱼（issue #82）：会话指纹注入 HTML 与登录页，且两者一致', async () => {
-  // 假上游：任何请求回 HTML 文档
+test('会话指纹已移除（2.10.0）：页面与登录页不再注入指纹/access 标记（issue #82/#83 后续）', async () => {
+  // 2.9.0 引入会话指纹防钓鱼、2.9.1 限制为仅公网生效；2.10.0 整体移除——
+  // 钓鱼站不经本代理、跑不到我们的校验代码，自动拦截层是死代码；人工比对不现实。
+  // 真正的防线仍是：公网强制密码（fail closed）+ PIN 每次开启轮换 + 登录限速 + 链接勿收藏提示。
   const up = createServer((req, res) => {
     res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
     res.end('<!doctype html><head><title>x</title></head><body>app</body>');
@@ -376,59 +377,15 @@ test('防钓鱼（issue #82）：会话指纹注入 HTML 与登录页，且两�
     auth: { getToken: () => TOKEN, isProtected: () => true, sessionKey: SK },
   });
   try {
-    // 1) 未认证公网请求 → 登录页，含会话指纹 meta + 可见指纹行（供交叉核对）
-    const login = (await getWithHost(proxy.port, 'abc.trycloudflare.com')).body;
-    const lm = login.match(/name="dsh-pocket-session" content="([A-Z0-9]{6})"/);
-    assert.ok(lm, '登录页含会话指纹 meta');
-    assert.ok(login.includes('本页会话指纹'), '登录页展示可见指纹供交叉核对');
-    const fp = lm[1];
-    // 2) 已认证应用页同样含同源指纹
-    const cookie = `dsh_pocket_token=${createHash('sha256').update(`${TOKEN}:${SK}`).digest('hex')}`;
-    const app = (await getWithHost(proxy.port, 'abc.trycloudflare.com', { cookie })).body;
-    const am = app.match(/name="dsh-pocket-session" content="([A-Z0-9]{6})"/);
-    assert.ok(am, '应用页含会话指纹 meta');
-    assert.equal(am[1], fp, '应用页与登录页指纹一致（同源）');
-    // 3) 局域网登录页不展示指纹（issue #83：局域网无子域复用风险，指纹是噪声）
-    const lanLogin = (await getWithHost(proxy.port, '192.168.1.100:3081')).body;
-    assert.ok(!lanLogin.includes('本页会话指纹'), '局域网登录页不展示会话指纹');
-    assert.ok(lanLogin.includes('此局域网地址'), '局域网登录页提示为局域网文案');
-  } finally {
-    await proxy.close();
-    await new Promise((r) => up.close(r));
-  }
-});
-
-test('会话指纹（issue #82）：6 位大写字母数字，进程内稳定', async () => {
-  const { ensureSessionFingerprint, getSessionFingerprint } = await import('../lib/session.mjs');
-  const a = ensureSessionFingerprint();
-  assert.match(a, /^[A-Z0-9]{6}$/, '6 位大写字母数字');
-  assert.equal(ensureSessionFingerprint(), a, '重复调用返回同一值');
-  assert.equal(getSessionFingerprint(), a, 'getSessionFingerprint 一致');
-});
-
-test('访问类型标记（issue #83）：公网注入 access=public、局域网 access=lan', async () => {
-  // 假上游：回 HTML
-  const up = createServer((req, res) => {
-    res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
-    res.end('<!doctype html><head><title>t</title></head><body>ok</body>');
-  });
-  await new Promise((r) => up.listen(0, '127.0.0.1', r));
-  const proxy = await createPocketProxy({ port: 0, host: '127.0.0.1', upstream: { host: '127.0.0.1', port: up.address().port } });
-  try {
-    // 公网 Host → access=public + session meta
     const pub = (await getWithHost(proxy.port, 'abc.trycloudflare.com')).body;
-    assert.ok(pub.includes('content="public"'), '公网 HTML 含 access=public');
-    assert.ok(pub.includes('dsh-pocket-session'), '公网 HTML 也含会话指纹 meta');
+    assert.ok(pub.includes('此公网地址'), '公网登录页正常');
+    assert.ok(!pub.includes('dsh-pocket-session'), '不再注入会话指纹 meta');
+    assert.ok(!pub.includes('dsh-pocket-access'), '不再注入访问类型标记');
+    assert.ok(!pub.includes('会话指纹'), '登录页不再展示指纹');
 
-    // 局域网 Host → access=lan + session meta（指纹仍注入，只是 sessionGuard 不启用）
     const lan = (await getWithHost(proxy.port, '192.168.1.100:3081')).body;
-    assert.ok(lan.includes('content="lan"'), '局域网 HTML 含 access=lan');
-    assert.ok(lan.includes('dsh-pocket-session'), '局域网 HTML 也含会话指纹 meta');
-    assert.ok(!lan.includes('content="public"'), '局域网不含 public 标记');
-
-    // 本机 loopback 也算非公网（cloudflared 回连就是走 127.0.0.1）
-    const loop = (await getWithHost(proxy.port, '127.0.0.1:3081')).body;
-    assert.ok(loop.includes('content="lan"'), 'loopback HTML 标记为 lan（不启用防钓鱼警告）');
+    assert.ok(lan.includes('此局域网地址'), '局域网登录页提示为局域网文案');
+    assert.ok(!lan.includes('dsh-pocket-session'), '局域网也不含指纹 meta');
   } finally {
     await proxy.close();
     await new Promise((r) => up.close(r));

@@ -503,92 +503,6 @@ function startFileGuard(readFile) {
   };
 }
 
-// client/mobile/sessionGuard.ts
-var SESSION_META = "dsh-pocket-session";
-var ACCESS_META = "dsh-pocket-access";
-function readFingerprint() {
-  const meta = document.querySelector(`meta[name="${SESSION_META}"]`);
-  const fp = meta?.content?.trim();
-  return fp && fp.length > 0 ? fp : null;
-}
-function readAccess() {
-  const meta = document.querySelector(`meta[name="${ACCESS_META}"]`);
-  return meta?.content?.trim() ?? null;
-}
-function mountBadge(fp) {
-  const badge = document.createElement("div");
-  badge.setAttribute("data-mobile-nav", "session-fp");
-  badge.textContent = `\u{1F512} \u4F1A\u8BDD\u6307\u7EB9 ${fp}`;
-  badge.style.cssText = [
-    "position:fixed",
-    "left:50%",
-    "bottom:8px",
-    "transform:translateX(-50%)",
-    "z-index:2147483646",
-    "padding:4px 10px",
-    "border-radius:999px",
-    "background:rgba(17,24,39,.82)",
-    "color:#fff",
-    'font:12px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif',
-    "letter-spacing:.5px",
-    "pointer-events:none",
-    "user-select:none",
-    "white-space:nowrap"
-  ].join(";");
-  badge.title = "\u672C\u9875\u4F1A\u8BDD\u6307\u7EB9\uFF0C\u5E94\u4E0E\u7535\u8111\u300C\u624B\u673A\u8BBF\u95EE\u300D\u8BBE\u7F6E\u9875\u663E\u793A\u7684\u4E00\u81F4\uFF1B\u4E0D\u4E00\u81F4\u8BF4\u660E\u94FE\u63A5\u5DF2\u88AB\u4ED6\u4EBA\u590D\u7528";
-  document.body.appendChild(badge);
-  return () => badge.remove();
-}
-function mountWarning() {
-  const overlay = document.createElement("div");
-  overlay.setAttribute("data-mobile-nav", "session-warn");
-  overlay.style.cssText = [
-    "position:fixed",
-    "inset:0",
-    "z-index:2147483647",
-    "display:flex",
-    "align-items:center",
-    "justify-content:center",
-    "padding:24px",
-    "background:rgba(0,0,0,.72)",
-    "color:#fff",
-    'font:15px/1.7 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif',
-    "text-align:center"
-  ].join(";");
-  overlay.style.whiteSpace = "pre-line";
-  overlay.textContent = "\u26A0\uFE0F \u6B64\u9875\u9762\u4E0D\u662F\u4F60\u7684 DSH\uFF1A\u94FE\u63A5\u53EF\u80FD\u5DF2\u88AB\u4ED6\u4EBA\u590D\u7528\u3002\n\u8BF7\u52FF\u5728\u6B64\u8F93\u5165\u4EFB\u4F55\u5BC6\u7801\u3002\n\u8BF7\u91CD\u65B0\u5728\u7535\u8111\u300C\u624B\u673A\u8BBF\u95EE\u300D\u8BBE\u7F6E\u9875\u626B\u5F53\u524D\u4E8C\u7EF4\u7801\u3002";
-  document.documentElement.appendChild(overlay);
-  return () => overlay.remove();
-}
-function startSessionGuard() {
-  if (readAccess() !== "public") return () => {
-  };
-  let cleanupBadge = null;
-  let cleanupWarn = null;
-  const evaluate = () => {
-    const fp = readFingerprint();
-    if (fp) {
-      cleanupWarn?.();
-      cleanupWarn = null;
-      if (!cleanupBadge) cleanupBadge = mountBadge(fp);
-    } else {
-      cleanupBadge?.();
-      cleanupBadge = null;
-      if (!cleanupWarn) cleanupWarn = mountWarning();
-    }
-  };
-  evaluate();
-  const timer = window.setTimeout(evaluate, 300);
-  const observer = new MutationObserver(evaluate);
-  observer.observe(document.documentElement, { childList: true, subtree: true });
-  return () => {
-    window.clearTimeout(timer);
-    observer.disconnect();
-    cleanupBadge?.();
-    cleanupWarn?.();
-  };
-}
-
 // client/mobile/mobile.css.ts
 var MOBILE_CSS = `
 /* ---------- base control styles (rendered at any width, hidden where unused) ---------- */
@@ -1747,11 +1661,6 @@ function mobileApply(ctx) {
     );
     return startFileGuard(readFile);
   }, "dsh-mobile-nav: file open guard + copy button + hide add-workspace (issue #17)");
-  ctx.effect(() => {
-    if (!narrow.matches) return () => {
-    };
-    return startSessionGuard();
-  }, "dsh-mobile-nav: session fingerprint guard (issue #82)");
   ctx.slots.inject("conversation.session.header.actions", () => ctx.slots.register({
     name: "conversation.session.header.actions",
     id: "mobile-nav-toggle",
@@ -1852,7 +1761,6 @@ var zh2 = {
   "wanPin": "\u{1F510} \u8BBF\u95EE\u5BC6\u7801\uFF1A{pin}\uFF08\u6BCF\u6B21\u5F00\u542F\u516C\u7F51\u53D8\u65B0\uFF1B\u624B\u673A\u6253\u5F00\u94FE\u63A5\u9700\u8F93\u5165\u6B64\u5BC6\u7801\uFF09",
   "wanPinCustom": "\u{1F510} \u8BBF\u95EE\u5BC6\u7801\uFF1A{pin}\uFF08\u81EA\u5B9A\u4E49\uFF0C\u5F00\u542F\u516C\u7F51\u4E0D\u518D\u81EA\u52A8\u6362\u65B0\uFF09",
   "wanEphemeralWarn": "\u26A0\uFE0F \u516C\u7F51\u94FE\u63A5\u4EC5\u5728\u672C\u6B21\u5F00\u542F\u671F\u95F4\u6709\u6548\uFF1A\u5173\u95ED\u6216\u91CD\u542F\u540E\u5931\u6548\uFF0C\u5E76\u53EF\u80FD\u88AB\u4ED6\u4EBA\u590D\u7528\u4E3A\u964C\u751F\u7F51\u7AD9\u3002\u8BF7\u52FF\u6536\u85CF\uFF0C\u6BCF\u6B21\u4ECE\u672C\u9875\u626B\u300C\u5F53\u524D\u300D\u4E8C\u7EF4\u7801\u3002\u9700\u8981\u56FA\u5B9A\u4E0D\u53D8\u7684\u5730\u5740\u8BF7\u7528\u4E0B\u65B9\u300C\u56FA\u5B9A\u57DF\u540D\u300D\u3002",
-  "wanSessionFp": "\u672C\u9875\u4F1A\u8BDD\u6307\u7EB9\uFF1A{fp}\uFF08\u624B\u673A\u767B\u5F55\u9875\u4F1A\u663E\u793A\u540C\u6837\u7684\uFF1B\u4E0D\u4E00\u81F4\u8BF4\u660E\u94FE\u63A5\u5DF2\u88AB\u4ED6\u4EBA\u590D\u7528\uFF0C\u8BF7\u52FF\u8F93\u5165\u5BC6\u7801\uFF09",
   "stopTunnel": "\u5173\u95ED\u516C\u7F51",
   "enable": "\u5F00\u542F\u516C\u7F51\u8BBF\u95EE",
   "opening": "\u5F00\u542F\u4E2D\u2026",
@@ -1949,7 +1857,6 @@ var en2 = {
   "wanPin": "\u{1F510} PIN: {pin} (changes each time the tunnel is enabled; required on the phone)",
   "wanPinCustom": "\u{1F510} PIN: {pin} (custom \u2014 not rotated on tunnel start)",
   "wanEphemeralWarn": '\u26A0\uFE0F The public link is valid only for this session: it stops working after you close or restart, and may be reused by someone else for an unrelated site. Do not bookmark it \u2014 scan the CURRENT QR code from this page each time. For a permanent address use "Fixed domain" below.',
-  "wanSessionFp": "Session fingerprint: {fp} (the phone login page shows the same; if it differs, the link has been reused \u2014 do not enter your PIN)",
   "stopTunnel": "Stop",
   "enable": "Enable anywhere",
   "opening": "Enabling\u2026",
@@ -2450,13 +2357,8 @@ function PocketSettingsTab({ rpcCall, t }) {
         "div",
         null,
         qrArea(status.tunnelQr, tunnelUrl, namedMode ? t("namedRunningHint") : t("wanHint")),
-        // 防钓鱼 / 别收藏（issue #82）：链接 ephemeral 提示 + 本次会话指纹交叉核对
+        // 防钓鱼 / 别收藏（issue #82）：公网链接仅本次有效、勿收藏提示
         (0, import_react2.createElement)("div", { style: { marginTop: 8, fontSize: 12, lineHeight: 1.5, borderLeft: "4px solid var(--dsw-alias-state-warn-primary,#b45309)", background: "var(--dsw-alias-bg-layer-2,#f3f4f6)", borderRadius: 8, padding: "8px 10px" } }, t("wanEphemeralWarn")),
-        status?.sessionFingerprint ? (0, import_react2.createElement)(
-          "div",
-          { style: { marginTop: 8, fontSize: 12, color: "var(--dsw-alias-label-secondary,#6b7280)", lineHeight: 1.5 } },
-          fmt(t, "wanSessionFp", { fp: status.sessionFingerprint })
-        ) : null,
         // 地址模式行（随机/固定；固定域名选中或编辑时高亮）
         row(
           t("modeLabel"),
