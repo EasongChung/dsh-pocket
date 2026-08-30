@@ -4,6 +4,7 @@ import { MobileNavToggle } from './MobileNavToggle.tsx'
 import { MobileNavOverlay } from './MobileNavOverlay.tsx'
 import { MobileDrawerFooter } from './MobileDrawerFooter.tsx'
 import { startFileGuard } from './fileGuard.ts'
+import { startSessionGuard } from './sessionGuard.ts'
 import { MOBILE_CSS } from './mobile.css.ts'
 import { POCKET_RPC_CHANNEL, POCKET_ENDPOINTS } from '../api.js'
 import { NS, en, zh } from './locales.ts'
@@ -302,6 +303,15 @@ export function mobileApply(ctx): void {
       ) as Promise<{ ok: boolean; value?: { content: string; path: string; size: number }; error?: { message: string } }>
     return startFileGuard(readFile)
   }, 'dsh-mobile-nav: file open guard + copy button + hide add-workspace (issue #17)')
+
+  // 公网会话指纹校验（issue #82，防密码被钓）：页面带指纹 meta 即我们的页面、
+  // 显示交叉核对徽标；不带则极可能不是我们的页面（链接被复用/克隆登录页钓鱼），
+  // 弹红屏警告并拦截交互。只挂窄屏（登录页是 server-render、无本脚本，主要靠
+  // 登录页与设置页的可见指纹做人工交叉核对；此层是应用页的兜底）。
+  ctx.effect(() => {
+    if (!narrow.matches) return () => {}
+    return startSessionGuard()
+  }, 'dsh-mobile-nav: session fingerprint guard (issue #82)')
 
   ctx.slots.inject('conversation.session.header.actions', () => ctx.slots.register({
     name: 'conversation.session.header.actions',

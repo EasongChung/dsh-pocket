@@ -4,6 +4,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
 import { connect } from 'node:net';
+import { createHash } from 'node:crypto';
 import { WebSocket, WebSocketServer } from 'ws';
 
 import { createPocketProxy } from '../lib/proxy.mjs';
@@ -282,6 +283,50 @@ test('HTML 注入：非安全上下文 polyfill 只注入 HTML 文档，不碰 J
     await proxy.close();
     await new Promise((r) => up.close(r));
   }
+});
+
+test('防钓鱼（issue #82）：会话指纹注入 HTML 与登录页，且两者一致', async () => {
+  // 假上游：任何请求回 HTML 文档
+  const up = createServer((req, res) => {
+    res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
+    res.end('<!doctype html><head><title>x</title></head><body>app</body>');
+  });
+  await new Promise((r) => up.listen(0, '127.0.0.1', r));
+  const TOKEN = 'ABCDE123';
+  const SK = 'session-key';
+  const proxy = await createPocketProxy({
+    port: 0, host: '127.0.0.1', upstream: { host: '127.0.0.1', port: up.address().port },
+    auth: { getToken: () => TOKEN, isProtected: () => true, sessionKey: SK },
+  });
+  try {
+    // 1) 未认证公网请求 → 登录页，含会话指纹 meta + 可见指纹行（供交叉核对）
+    const login = await (await fetch(`http://127.0.0.1:${proxy.port}/`, {
+      headers: { Host: 'abc.trycloudflare.com', Accept: 'text/html' },
+    })).text();
+    const lm = login.match(/name="dsh-pocket-session" content="([A-Z0-9]{6})"/);
+    assert.ok(lm, '登录页含会话指纹 meta');
+    assert.ok(login.includes('本页会话指纹'), '登录页展示可见指纹供交叉核对');
+    const fp = lm[1];
+    // 2) 已认证应用页同样含同源指纹
+    const cookie = `dsh_pocket_token=${createHash('sha256').update(`${TOKEN}:${SK}`).digest('hex')}`;
+    const app = await (await fetch(`http://127.0.0.1:${proxy.port}/`, {
+      headers: { Host: 'abc.trycloudflare.com', Accept: 'text/html', cookie },
+    })).text();
+    const am = app.match(/name="dsh-pocket-session" content="([A-Z0-9]{6})"/);
+    assert.ok(am, '应用页含会话指纹 meta');
+    assert.equal(am[1], fp, '应用页与登录页指纹一致（同源）');
+  } finally {
+    await proxy.close();
+    await new Promise((r) => up.close(r));
+  }
+});
+
+test('会话指纹（issue #82）：6 位大写字母数字，进程内稳定', async () => {
+  const { ensureSessionFingerprint, getSessionFingerprint } = await import('../lib/session.mjs');
+  const a = ensureSessionFingerprint();
+  assert.match(a, /^[A-Z0-9]{6}$/, '6 位大写字母数字');
+  assert.equal(ensureSessionFingerprint(), a, '重复调用返回同一值');
+  assert.equal(getSessionFingerprint(), a, 'getSessionFingerprint 一致');
 });
 
 test('压缩 HTML（gzip）不注入 polyfill——防止损坏压缩流', async () => {
