@@ -76,6 +76,11 @@ test('firstMeaningfulErrorLine: 参数错误取开头首行', () => {
   assert.equal(firstMeaningfulErrorLine(buf), 'Incorrect Usage: flag provided but not defined: -no-autoupdate');
 });
 
+test('firstMeaningfulErrorLine: 版本横幅在前后仍能取到参数错误行', () => {
+  const buf = 'cloudflared version 2026.4.0\nIncorrect Usage: flag provided but not defined: -no-autoupdate\n\nNAME:\n  cloudflared tunnel run ...';
+  assert.equal(firstMeaningfulErrorLine(buf), 'Incorrect Usage: flag provided but not defined: -no-autoupdate');
+});
+
 test('firstMeaningfulErrorLine: 运行期错误（403）仍取尾部', () => {
   const buf = 'INF Starting tunnel\nERR Failed to connect to origin: 403 Forbidden\nERR retrying';
   const r = firstMeaningfulErrorLine(buf);
