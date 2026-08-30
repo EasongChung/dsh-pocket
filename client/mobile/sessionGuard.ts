@@ -12,11 +12,18 @@
 //     弹红色全屏警告并拦截交互，防止用户在被钓鱼页输入 8 位密码。
 
 const SESSION_META = 'dsh-pocket-session'
+const ACCESS_META = 'dsh-pocket-access'
 
 function readFingerprint(): string | null {
   const meta = document.querySelector<HTMLMetaElement>(`meta[name="${SESSION_META}"]`)
   const fp = meta?.content?.trim()
   return fp && fp.length > 0 ? fp : null
+}
+
+/** 读取代理注入的访问类型标记（public | lan）。 */
+function readAccess(): string | null {
+  const meta = document.querySelector<HTMLMetaElement>(`meta[name="${ACCESS_META}"]`)
+  return meta?.content?.trim() ?? null
 }
 
 function mountBadge(fp: string): () => void {
@@ -52,6 +59,10 @@ function mountWarning(): () => void {
 }
 
 export function startSessionGuard(): () => void {
+  // 局域网访问不存在「快速隧道子域被 Cloudflare 回收复用」的风险（issue #83），
+  // 防钓鱼校验只在公网启用；局域网直接不挂，避免误报阻断用户使用。
+  if (readAccess() !== 'public') return () => {}
+
   let cleanupBadge: (() => void) | null = null
   let cleanupWarn: (() => void) | null = null
   const evaluate = (): void => {

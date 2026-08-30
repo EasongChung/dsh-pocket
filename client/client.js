@@ -505,10 +505,15 @@ function startFileGuard(readFile) {
 
 // client/mobile/sessionGuard.ts
 var SESSION_META = "dsh-pocket-session";
+var ACCESS_META = "dsh-pocket-access";
 function readFingerprint() {
   const meta = document.querySelector(`meta[name="${SESSION_META}"]`);
   const fp = meta?.content?.trim();
   return fp && fp.length > 0 ? fp : null;
+}
+function readAccess() {
+  const meta = document.querySelector(`meta[name="${ACCESS_META}"]`);
+  return meta?.content?.trim() ?? null;
 }
 function mountBadge(fp) {
   const badge = document.createElement("div");
@@ -556,6 +561,8 @@ function mountWarning() {
   return () => overlay.remove();
 }
 function startSessionGuard() {
+  if (readAccess() !== "public") return () => {
+  };
   let cleanupBadge = null;
   let cleanupWarn = null;
   const evaluate = () => {
