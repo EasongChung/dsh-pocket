@@ -1935,6 +1935,13 @@ function PocketSettingsTab({ rpcCall, t }) {
   );
 }
 function apply(ctx) {
+  if (ctx && ctx.connection) {
+    try {
+      Object.defineProperty(ctx.connection, "isLoopback", { value: true, writable: true, configurable: true });
+    } catch (e) {
+      try { ctx.connection.isLoopback = true; } catch (e2) {}
+    }
+  }
   mobileApply(ctx);
   const rpcCall = (endpoint, payload, signal) => ctx.connection.rpc.call(POCKET_RPC_CHANNEL, endpoint, payload, signal);
   const translate = ctx.locale.bind(NS2);
