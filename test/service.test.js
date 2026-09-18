@@ -256,6 +256,34 @@ test('RPC：lan.setEnabled 设置局域网访问总开关并回写到 status', a
   await service.dispose();
 });
 
+test('RPC：mobile.rightbar.setEnabled 默认开启并回写到 status', async () => {
+  const internals = stubInternals();
+  let enabled = true;
+  const service = createPocketService({ dshPort: 3080, port: 3081, internals });
+  const conn = fakeCtxConnection();
+  installPocketRpc({ connection: conn }, {
+    service,
+    getMobileRightbarEnabled: () => enabled,
+    setMobileRightbarEnabled: (on) => { enabled = on === true; return enabled; },
+    log: { error() {}, warn() {} },
+  });
+
+  const initial = await conn.handler(POCKET_ENDPOINTS.status, {});
+  assert.equal(initial.ok, true);
+  assert.equal(initial.value.mobileRightbarEnabled, true, '默认开启');
+
+  const off = await conn.handler(POCKET_ENDPOINTS.mobileRightbarSetEnabled, { on: false });
+  assert.equal(off.ok, true);
+  assert.equal(off.value.mobileRightbarEnabled, false, '关闭成功');
+  assert.equal((await conn.handler(POCKET_ENDPOINTS.status, {})).value.mobileRightbarEnabled, false, 'status 反映关闭');
+
+  const on = await conn.handler(POCKET_ENDPOINTS.mobileRightbarSetEnabled, { on: true });
+  assert.equal(on.ok, true);
+  assert.equal(on.value.mobileRightbarEnabled, true, '可再次开启');
+
+  await service.dispose();
+});
+
 test('RPC：status 携带重启提示（restartNotice）', async () => {
   const internals = stubInternals();
   const service = createPocketService({ dshPort: 3080, port: 3081, internals });
@@ -658,13 +686,65 @@ test('公网隧道自动恢复：开启时持久化标记，重启后 restoreTun
 
   // 手动关闭 → 标记清除 → 下次不自动恢复
   service2.stopTunnel();
-  await new Promise((r) => setTimeout(r, 30));
-  const afterClose = await fsp.readFile(statePath, 'utf8').catch(() => null);
+  // Windows 上 rm 可能与实时扫描竞态偶发失败（clearAutoTunnel 内部吞错），轮询等待落盘
+  let afterClose = null;
+  for (let i = 0; i < 50; i++) {
+    afterClose = await fsp.readFile(statePath, 'utf8').catch(() => null);
+    if (afterClose === null) break;
+    await new Promise((r) => setTimeout(r, 20));
+  }
   assert.equal(afterClose, null, '关闭后删除标记');
   const service3 = createPocketService({ dshPort: 3080, port: 3081, home, internals });
   await service3.startProxy();
   await service3.restoreTunnelIfNeeded();
   assert.equal(startCount, 2, '无标记不自动恢复');
+
+  await fsp.rm(home, { recursive: true, force: true });
+});
+
+test('公网隧道自动恢复：dispose（进程退出/重启）保留标记，下次启动仍自动拉起；手动 stopTunnel 仍删标记（issue #11 语义澄清）', async () => {
+  const fsp = await import('node:fs/promises');
+  const os = await import('node:os');
+  const path = await import('node:path');
+  const home = await fsp.mkdtemp(path.join(os.tmpdir(), 'dshp-dispose-'));
+
+  let startCount = 0;
+  const internals = {
+    ...stubInternals(),
+    startTunnel: async () => {
+      startCount += 1;
+      return { url: 'https://auto.trycloudflare.com', kill: () => {} };
+    },
+  };
+  const statePath = path.join(home, 'dsh-pocket', 'tunnel-auto.json');
+
+  const service1 = createPocketService({ dshPort: 3080, port: 3081, home, internals });
+  await service1.startProxy();
+  await service1.startTunnel();
+  await new Promise((r) => setTimeout(r, 60));
+  assert.ok((await fsp.readFile(statePath, 'utf8')).includes('"at"'), '开启后写入标记');
+
+  // 模拟 DSH 正常重启：dispose（插件卸载）→ 隧道随进程被动消失，不是用户主动关闭 → 标记必须保留。
+  // 回归背景：dispose 曾无条件 clearAutoTunnel，导致每次正常重启后隧道永远不会自动恢复
+  // （只有进程被强杀、dispose 未跑完时才侥幸可用）。
+  await service1.dispose();
+  await new Promise((r) => setTimeout(r, 30));
+  assert.ok((await fsp.readFile(statePath, 'utf8')).includes('"at"'), 'dispose 保留自动恢复标记');
+
+  const service2 = createPocketService({ dshPort: 3080, port: 3081, home, internals });
+  await service2.startProxy();
+  await service2.restoreTunnelIfNeeded();
+  assert.equal(startCount, 2, 'dispose 后重启仍自动恢复');
+
+  // 对照：手动 stopTunnel()（设置页关闭）仍然删除标记
+  service2.stopTunnel();
+  let afterClose = null;
+  for (let i = 0; i < 50; i++) {
+    afterClose = await fsp.readFile(statePath, 'utf8').catch(() => null);
+    if (afterClose === null) break;
+    await new Promise((r) => setTimeout(r, 20));
+  }
+  assert.equal(afterClose, null, '手动关闭仍删除标记');
 
   await fsp.rm(home, { recursive: true, force: true });
 });
@@ -780,4 +860,30 @@ Ethernet adapter WLAN:
     if (prevWslEnv === undefined) delete process.env.WSLENV;
     else process.env.WSLENV = prevWslEnv;
   }
+});
+
+test('startTunnel 同步抛错后不残留 rejected 的 in-flight（TDZ 回归）：修好配置后可再次启动', async () => {
+  // 回归背景：启动流程里 `const p = tunnelPromise` 声明在 async IIFE 之后，
+  // 而 IIFE 体内没有 await 之前的挂起点——getTunnelConfig 之类同步抛错时，
+  // finally 会引用尚未初始化的 `p` 触发 TDZ 报错，tunnelPromise 永远停在
+  // rejected，后续 startTunnel 一直复用这个失败态，隧道再也起不来。
+  const internals = stubInternals();
+  let broken = true;
+  const service = createPocketService({
+    dshPort: 3080,
+    port: 3081,
+    internals,
+    getTunnelConfig: () => {
+      if (broken) throw new Error('config boom');
+      return { mode: 'quick' };
+    },
+  });
+  await service.startProxy();
+  await assert.rejects(() => service.startTunnel(), /config boom/, '第一次因配置读取失败而拒绝');
+
+  broken = false;
+  const url = await service.startTunnel();
+  assert.equal(url, 'https://abc-123.trycloudflare.com', '修好后能正常启动，没有残留失败态');
+  assert.equal((await service.status()).tunnelRunning, true, '隧道确实起来了');
+  await service.dispose();
 });

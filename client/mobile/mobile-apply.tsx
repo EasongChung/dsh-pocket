@@ -5,7 +5,7 @@ import { MobileNavOverlay } from './MobileNavOverlay.tsx'
 import { MobileDrawerFooter } from './MobileDrawerFooter.tsx'
 import { startFileGuard } from './fileGuard.ts'
 import { MOBILE_CSS } from './mobile.css.ts'
-import { POCKET_RPC_CHANNEL, POCKET_ENDPOINTS } from '../api.js'
+import { POCKET_RPC_CHANNEL, POCKET_ENDPOINTS, MOBILE_RIGHTBAR_ATTRIBUTE, MOBILE_RIGHTBAR_EVENT } from '../api.js'
 import { NS, en, zh } from './locales.ts'
 import type { MobileNavKey } from './locales.ts'
 import { resolveLayout, persistLayoutFromUrl } from './layout-mode.mjs'
@@ -43,6 +43,34 @@ export function mobileApply(ctx): void {
   }
 
   ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'dsh-mobile-nav: dictionaries')
+
+  ctx.effect(() => {
+    let active = true
+    const applyEnabled = (enabled: boolean): void => {
+      document.body?.setAttribute(MOBILE_RIGHTBAR_ATTRIBUTE, enabled ? 'on' : 'off')
+    }
+    const onChange = (event: Event): void => {
+      applyEnabled((event as CustomEvent<{ enabled?: boolean }>).detail?.enabled === true)
+    }
+    const load = async (): Promise<void> => {
+      try {
+        const result = await ctx.connection.rpc.call(POCKET_RPC_CHANNEL, POCKET_ENDPOINTS.status, {}) as {
+          ok?: boolean
+          value?: { mobileRightbarEnabled?: boolean }
+        }
+        if (active) applyEnabled(result?.ok === true ? result.value?.mobileRightbarEnabled !== false : true)
+      } catch {
+        if (active) applyEnabled(true)
+      }
+    }
+    window.addEventListener(MOBILE_RIGHTBAR_EVENT, onChange)
+    void load()
+    return () => {
+      active = false
+      window.removeEventListener(MOBILE_RIGHTBAR_EVENT, onChange)
+      document.body?.removeAttribute(MOBILE_RIGHTBAR_ATTRIBUTE)
+    }
+  }, 'dsh-mobile-nav: optional right sidebar')
 
   ctx.effect(() => {
     const tag = document.createElement('style')
@@ -182,11 +210,10 @@ export function mobileApply(ctx): void {
 
   // The official conversation status row (turns / steps / LLM time / TTFT /
   // cache) has a hashed class, so the stylesheet cannot target it directly.
-  // Mark the exact row on narrow screens by text: a [class$=_root] that
-  // carries the metrics text and no textarea (the composer card also ends in
-  // _root and can mention turns in its model line). The CSS then lays the
-  // marked row out as ONE horizontally scrolling line with every metric
-  // reachable.
+  // Its stable boundary is the official conversation.composer.dock slot. Mark
+  // only the metrics root inside that slot; never scan every *_root under the
+  // composer because the editor itself is now contenteditable (not textarea)
+  // and its root also contains the dock text.
   ctx.effect(() => {
     if (!narrow.matches) return () => {}
     // The composer root renders the TPS readout ("TPS 89.4 tok/s") as its
@@ -206,13 +233,10 @@ export function mobileApply(ctx): void {
       }
     }
     const mark = (): void => {
-      for (const root of document.querySelectorAll('[data-phase] [class$="_root"]')) {
-        // The status row lives inside the composer stack; message-area
-        // blocks can also mention turns/steps and must be skipped.
-        if (root.closest('[class$="_composerStack"]') === null) continue
+      const selector = '[data-phase] [data-slot="conversation.composer.dock"] [class$="_root"]'
+      for (const root of document.querySelectorAll(selector)) {
         const text = root.textContent ?? ''
         if (!/(turns|steps|\bLLM\b|轮|步)/.test(text)) continue
-        if (root.querySelector('textarea') !== null) continue
         root.setAttribute('data-mobile-nav', 'stats')
         moveTps(root)
         return
@@ -302,6 +326,38 @@ export function mobileApply(ctx): void {
       ) as Promise<{ ok: boolean; value?: { content: string; path: string; size: number }; error?: { message: string } }>
     return startFileGuard(readFile)
   }, 'dsh-mobile-nav: file open guard + copy button + hide add-workspace (issue #17)')
+
+  // 手机上模型 / 提供方设置加载失败：上游 dsh-web 会渲染「加载提供方目录失败 /
+  // Settings are unavailable in this browser」。这条文案不是 dsh-pocket 的，但手机侧
+  // 本就不支持改模型设置，原报错只会吓到用户。窄屏下用 MutationObserver 就地把该报错
+  // 文本替换成「去电脑端修改」的引导提示（仅手机，桌面端不受影响）。
+  ctx.effect(() => {
+    if (!narrow.matches) return () => {}
+    const PHRASES = ['加载提供方目录失败', 'Settings are unavailable in this browser']
+    const NOTICE = '手机上不支持模型设置，请去电脑端修改设置'
+    // 取包含报错文案的最深节点，避免把外层大容器整块清掉。
+    const findDeepest = (el: Element): Element => {
+      let deepest = el
+      for (const child of el.querySelectorAll('*')) {
+        if (PHRASES.some((p) => (child.textContent ?? '').includes(p))) deepest = child
+      }
+      return deepest
+    }
+    const patch = (): void => {
+      for (const el of document.querySelectorAll('body *')) {
+        const t = el.textContent ?? ''
+        if (!PHRASES.some((p) => t.includes(p))) continue
+        if ((el as HTMLElement).dataset?.dshpModelNotice === '1') continue
+        const target = findDeepest(el)
+        target.textContent = NOTICE
+        ;(target as HTMLElement).dataset.dshpModelNotice = '1'
+      }
+    }
+    const observer = new MutationObserver(patch)
+    observer.observe(document.body, { childList: true, subtree: true, characterData: true })
+    patch()
+    return () => observer.disconnect()
+  }, 'dsh-mobile-nav: replace model-settings load error with mobile hint')
 
 
   ctx.slots.inject('conversation.session.header.actions', () => ctx.slots.register({

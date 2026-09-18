@@ -41,6 +41,8 @@ var import_react2 = require("react");
 
 // client/api.js
 var POCKET_RPC_CHANNEL = "/dsh-pocket";
+var MOBILE_RIGHTBAR_ATTRIBUTE = "data-dsh-pocket-mobile-rightbar";
+var MOBILE_RIGHTBAR_EVENT = "dsh-pocket:mobile-rightbar";
 var POCKET_ENDPOINTS = Object.freeze({
   status: "pocket.status",
   tunnelStart: "tunnel.start",
@@ -53,6 +55,7 @@ var POCKET_ENDPOINTS = Object.freeze({
   lanAuthSetEnabled: "lanAuth.setEnabled",
   lanSetOverride: "lan.setOverride",
   lanSetEnabled: "lan.setEnabled",
+  mobileRightbarSetEnabled: "mobile.rightbar.setEnabled",
   pinSetCustom: "pin.setCustom",
   pocketReset: "pocket.reset",
   // 移动端「复制文件内容」（issue #17）：手机经此 RPC 让主机读取文件正文，
@@ -239,42 +242,104 @@ function MobileNavOverlay({ toggleSidebar, t }) {
   }, [mobile, open, toggleSidebar]);
   (0, import_react.useEffect)(() => {
     if (!mobile || !open) return;
-    const onDrawerClick = (event) => {
-      if (document.querySelector('[aria-modal="true"]') !== null) return;
-      const target = event.target;
-      if (target === null) return;
-      const drawer = document.querySelector(DRAWER_SELECTOR);
-      if (drawer === null || !drawer.contains(target)) return;
-      if (navTargetFor(target) !== null) toggleSidebar();
+    let lastTouchNavAt = 0;
+    let lastTouchX = 0;
+    let lastTouchY = 0;
+    let suppressTouchClickUntil = 0;
+    let pendingTouchRow = null;
+    let selectedRowAtArm = null;
+    let navClickArrived = false;
+    let navObserver = null;
+    let navTimer = null;
+    const drawerRoot = () => document.querySelector(DRAWER_SELECTOR);
+    const disarmNav = () => {
+      navObserver?.disconnect();
+      navObserver = null;
+      if (navTimer !== null) window.clearTimeout(navTimer);
+      navTimer = null;
+      pendingTouchRow = null;
+      selectedRowAtArm = null;
+      navClickArrived = false;
     };
-    document.addEventListener("click", onDrawerClick, true);
-    return () => document.removeEventListener("click", onDrawerClick, true);
-  }, [mobile, open, toggleSidebar]);
-  (0, import_react.useEffect)(() => {
-    if (!mobile || !open) return;
-    let timer = null;
+    const armNav = (row) => {
+      disarmNav();
+      pendingTouchRow = row;
+      const drawer = drawerRoot();
+      selectedRowAtArm = drawer?.querySelector('[role="treeitem"][aria-selected="true"]') ?? null;
+      if (drawer === null) return;
+      navObserver = new MutationObserver(() => {
+        const frame = document.querySelector('[data-mobile-nav="frame"]');
+        if (frame === null || frame.hasAttribute("data-sidebar-collapsed")) {
+          disarmNav();
+          return;
+        }
+        const selectedRow = drawerRoot()?.querySelector('[role="treeitem"][aria-selected="true"]') ?? null;
+        if (navClickArrived && selectedRow !== null && selectedRow !== selectedRowAtArm) {
+          disarmNav();
+          toggleSidebar();
+        }
+      });
+      navObserver.observe(drawer, {
+        childList: true,
+        subtree: true,
+        attributes: true,
+        attributeFilter: ["aria-selected"]
+      });
+      navTimer = window.setTimeout(disarmNav, 2e3);
+    };
+    const navigationTarget = (target) => {
+      if (document.querySelector('[aria-modal="true"]') !== null) return null;
+      const frame = document.querySelector('[data-mobile-nav="frame"]');
+      if (frame === null || frame.hasAttribute("data-sidebar-collapsed")) return null;
+      if (!(target instanceof Element)) return null;
+      const drawer = drawerRoot();
+      if (drawer === null || !drawer.contains(target)) return null;
+      return navTargetFor(target);
+    };
+    const isPendingTouchClick = (event) => {
+      const capabilities = event.sourceCapabilities;
+      if (capabilities?.firesTouchEvents === true) return true;
+      return Math.hypot(event.clientX - lastTouchX, event.clientY - lastTouchY) <= 24;
+    };
+    const onDrawerClick = (event) => {
+      if (performance.now() < suppressTouchClickUntil) return;
+      if (pendingTouchRow !== null && performance.now() - lastTouchNavAt < 500 && isPendingTouchClick(event)) {
+        const target = navigationTarget(event.target);
+        const row = target?.closest('[role="treeitem"]');
+        if (row !== null && row !== void 0) {
+          pendingTouchRow = row;
+          navClickArrived = true;
+          return;
+        }
+      }
+      if (navigationTarget(event.target) !== null) toggleSidebar();
+    };
     const onDrawerPointerUp = (event) => {
       if (event.pointerType !== "touch" && event.pointerType !== "pen") return;
-      const target = event.target;
-      if (!(target instanceof Element)) return;
-      const drawer = document.querySelector(DRAWER_SELECTOR);
-      if (drawer === null || !drawer.contains(target)) return;
-      if (navTargetFor(target) === null) return;
-      if (timer !== null) return;
-      timer = window.setTimeout(() => {
-        timer = null;
-        const frame = document.querySelector('[data-mobile-nav="frame"]');
-        if (frame === null || frame.hasAttribute("data-sidebar-collapsed")) return;
-        const row = navTargetFor(target);
-        row?.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, view: window }));
-      }, 0);
+      const target = navigationTarget(event.target);
+      if (target === null) return;
+      const row = target.closest('[role="treeitem"]');
+      if (row !== null) {
+        if (row.getAttribute("aria-selected") === "true") {
+          suppressTouchClickUntil = performance.now() + 500;
+          toggleSidebar();
+        } else {
+          lastTouchNavAt = performance.now();
+          lastTouchX = event.clientX;
+          lastTouchY = event.clientY;
+          armNav(row);
+        }
+        return;
+      }
     };
+    document.addEventListener("click", onDrawerClick, true);
     document.addEventListener("pointerup", onDrawerPointerUp, true);
     return () => {
-      if (timer !== null) window.clearTimeout(timer);
+      disarmNav();
+      document.removeEventListener("click", onDrawerClick, true);
       document.removeEventListener("pointerup", onDrawerPointerUp, true);
     };
-  }, [mobile, open]);
+  }, [mobile, open, toggleSidebar]);
   (0, import_react.useEffect)(() => {
     if (!mobile || !open) return;
     const onOutsideClick = (event) => {
@@ -283,6 +348,8 @@ function MobileNavOverlay({ toggleSidebar, t }) {
       if (target === null) return;
       if (target.closest(TOGGLE_SELECTOR) !== null) return;
       if (isOverlayTap(target)) return;
+      const frame = document.querySelector('[data-mobile-nav="frame"]');
+      if (frame === null || frame.hasAttribute("data-sidebar-collapsed")) return;
       const drawer = document.querySelector(DRAWER_SELECTOR);
       if (drawer !== null && drawer.contains(target)) return;
       toggleSidebar();
@@ -824,26 +891,77 @@ var MOBILE_CSS = `
     font-size: 15px !important;
   }
 
+  /* Keep DSH's own process disclosures and their expand/collapse behaviour,
+     but remove desktop-sized vertical breathing room between consecutive
+     context, Skill, and system-prompt entries. */
+  [data-phase] [data-turn-process] {
+    height: 28px !important;
+    padding-bottom: 4px !important;
+    margin-bottom: 4px !important;
+  }
+  [data-phase] [data-turn-process][data-open] {
+    margin-bottom: 4px !important;
+  }
+  [data-phase] [data-disclosure-row] {
+    min-height: 24px !important;
+  }
+  [data-phase] :is([data-context-injection-body], [data-system-prompt-body]) {
+    margin-top: 2px !important;
+  }
+
   /* --- Composer bottom row on mobile ---
-     The official row gives the model pill (trailing) flex:0 0 auto, which
-     squeezes the agent-permission pill (modes) down to 15px: the pill's
-     chevron then overflows on top of the model name. Let the permission
-     pill keep its natural width and let the model pill shrink instead.
-     Anchored by the composer card (:has(textarea)): row = last child,
-     tools = first child, permission pill = its 2nd child, model pill =
-     row's last child. */
-  [data-phase] [class*="_card"]:has(textarea) > :last-child {
+     Keep add, permission, model, reasoning and send controls on one line at
+     the Honor 50's 360px CSS viewport. DSH's stable data-composer-card hook
+     survives the editor's textarea -> contenteditable migration. */
+  [data-phase] [data-composer-card="true"] > [class$="_row"] {
+    flex-wrap: nowrap !important;
+    gap: 6px !important;
+  }
+  [data-phase] [data-composer-card="true"] > [class$="_row"] > :first-child {
     gap: 8px !important;
-  }
-  [data-phase] [class*="_card"]:has(textarea) > :last-child > :first-child {
-    gap: 8px !important;
-  }
-  [data-phase] [class*="_card"]:has(textarea) > :last-child > :first-child > :nth-child(2) {
-    flex: 0 0 auto !important;
-  }
-  [data-phase] [class*="_card"]:has(textarea) > :last-child > :last-child {
-    flex: 1 1 auto !important;
     min-width: 0 !important;
+  }
+  [data-phase] [data-composer-card="true"] > [class$="_row"] > :first-child > :nth-child(2) {
+    flex: 0 1 auto !important;
+    min-width: 0 !important;
+  }
+  [data-phase] [data-composer-card="true"] > [class$="_row"] > :last-child {
+    flex: 1 1 0 !important;
+    min-width: 0 !important;
+    gap: 6px !important;
+  }
+
+  /* --- Composer popups as bottom sheets on mobile ---
+     Two composer-anchored popups break on phones (field: bottom + side
+     cut, only part of the popup visible):
+     1. the model pill menu ([role=menu], max 360px, opens upward from the
+        pill inside the composer card);
+     2. the "/" command palette (max 320px card with the search box \u2014 it
+        hosts the /model popupSelect list: search + provider-grouped rows).
+     Both are position:absolute INSIDE the conversation scrollBody
+     (overflow:hidden) and the shell center column (overflow:hidden), so
+     the scroll containers clip them mid-list. Forensics showed neither
+     layer creates a containing block (no transform/contain/will-change),
+     so on mobile we snap whichever popup is open to a viewport-anchored
+     sheet: fixed positioning escapes the scroll clip entirely, width is
+     deterministic, safe-area keeps it off the gesture bar. A transient
+     picker covering the composer is standard mobile UX; selection or an
+     outside tap still dismisses it. */
+  [data-phase] [class$="_root"]:has(> [aria-haspopup="menu"]) > [role="menu"],
+  [data-phase] [class$="_card"]:has(> [class$="_search"]) {
+    position: fixed !important;
+    left: 12px !important;
+    right: 12px !important;
+    top: auto !important;
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 12px) !important;
+    width: auto !important;
+    min-width: 0 !important;
+    max-width: none !important;
+    max-height: min(65vh, 480px) !important;
+    max-height: min(65dvh, 480px) !important;
+    z-index: 130 !important;
+    border-radius: 14px !important;
+    box-shadow: 0 -4px 28px rgba(0, 0, 0, .18) !important;
   }
 
   /* --- Composer popups as bottom sheets on mobile ---
@@ -880,21 +998,25 @@ var MOBILE_CSS = `
   }
 
   /* --- Session header on mobile ---
-     Layout goal: [toggle] [session title] [mode badge] in a row, with the
-     Session log capsule removed from the header (relocated to the drawer
-     footer). Stable structural hooks only:
-       [data-phase] header                     the session header element
-       header > :first-child                   titleRow (titleCluster + utilities)
-       header > :first-child > :last-child     headerUtilities (Session log seat) */
+     Layout goal: [toggle] [session title] [mode badge] in a row. The optional
+     rightbar entry uses the shell's stable header-corner hook. */
   [data-phase] header {
-    padding-right: 12px !important;
+    padding: 8px 12px 0 !important;
   }
-  /* Give the title row a lane clear of the absolutely-placed toggle, then
-     balance the header: with header padding-right 12px, a 20px left
-     padding puts the title's geometric center exactly on the viewport
-     center (measured 195/195 at 390px). */
+  /* The directory and Files controls are absolutely positioned, so reserve
+     their lanes and let the title use the remaining width without squeezing. */
   [data-phase] header > :first-child {
-    padding-left: 20px !important;
+    min-height: 36px !important;
+    padding: 0 32px !important;
+  }
+  [data-phase] header [class$="_titleCluster"],
+  [data-phase] header [class$="_crumbs"] {
+    min-width: 0 !important;
+  }
+  [data-phase] header button[class*="_crumb"] {
+    max-width: calc(100vw - 104px) !important;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
   }
   /* The directory toggle sits at the far left of the header (the header
      is position:relative; the data-slot wrappers are display:contents). */
@@ -914,10 +1036,13 @@ var MOBILE_CSS = `
     top: 12px !important;
     z-index: 2 !important;
   }
-  /* Session log download: gone from the header row on mobile (the utilities
-     seat holds only the session-log-export capsule). */
-  [data-phase] header > :first-child > :last-child {
+  /* The native rightbar entry is visible by default. Users who prefer the
+     compact header can turn it off in Pocket settings. */
+  body[data-dsh-pocket-mobile-rightbar="off"] [data-conversation-header-corner] {
     display: none !important;
+  }
+  body:not([data-dsh-pocket-mobile-rightbar="off"]) [data-mobile-nav="files"] {
+    right: 44px !important;
   }
 
   /* --- Settings dialog on mobile ---
@@ -1440,6 +1565,19 @@ var MOBILE_CSS = `
   }
 }
 
+/* ---------- mobile: stop iOS Safari forced zoom on input focus ----------
+ * Inputs are rendered with inline fontSize 13-14px, below the 16px threshold
+ * that makes iOS Safari zoom the whole page on focus (and never recover).
+ * Force the safe 16px minimum on narrow viewports only, so desktop keeps its
+ * tighter metrics. !important is required to beat the inline styles. */
+@media (max-width: 1024px) {
+  input,
+  textarea,
+  [contenteditable="true"] {
+    font-size: 16px !important;
+  }
+}
+
 /* ---------- desktop: the mobile controls must never appear ---------- */
 
 @media (min-width: 1024px) {
@@ -1512,6 +1650,30 @@ function mobileApply(ctx) {
     } };
   }
   ctx.effect(() => ctx.locale.register(NS, { zh, en }), "dsh-mobile-nav: dictionaries");
+  ctx.effect(() => {
+    let active = true;
+    const applyEnabled = (enabled) => {
+      document.body?.setAttribute(MOBILE_RIGHTBAR_ATTRIBUTE, enabled ? "on" : "off");
+    };
+    const onChange = (event) => {
+      applyEnabled(event.detail?.enabled === true);
+    };
+    const load = async () => {
+      try {
+        const result = await ctx.connection.rpc.call(POCKET_RPC_CHANNEL, POCKET_ENDPOINTS.status, {});
+        if (active) applyEnabled(result?.ok === true ? result.value?.mobileRightbarEnabled !== false : true);
+      } catch {
+        if (active) applyEnabled(true);
+      }
+    };
+    window.addEventListener(MOBILE_RIGHTBAR_EVENT, onChange);
+    void load();
+    return () => {
+      active = false;
+      window.removeEventListener(MOBILE_RIGHTBAR_EVENT, onChange);
+      document.body?.removeAttribute(MOBILE_RIGHTBAR_ATTRIBUTE);
+    };
+  }, "dsh-mobile-nav: optional right sidebar");
   ctx.effect(() => {
     const tag = document.createElement("style");
     tag.dataset.plugin = "@dsh-external/dsh-mobile-nav";
@@ -1621,11 +1783,10 @@ function mobileApply(ctx) {
       }
     };
     const mark = () => {
-      for (const root of document.querySelectorAll('[data-phase] [class$="_root"]')) {
-        if (root.closest('[class$="_composerStack"]') === null) continue;
+      const selector = '[data-phase] [data-slot="conversation.composer.dock"] [class$="_root"]';
+      for (const root of document.querySelectorAll(selector)) {
         const text = root.textContent ?? "";
         if (!/(turns|steps|\bLLM\b|轮|步)/.test(text)) continue;
-        if (root.querySelector("textarea") !== null) continue;
         root.setAttribute("data-mobile-nav", "stats");
         moveTps(root);
         return;
@@ -1694,6 +1855,33 @@ function mobileApply(ctx) {
     );
     return startFileGuard(readFile);
   }, "dsh-mobile-nav: file open guard + copy button + hide add-workspace (issue #17)");
+  ctx.effect(() => {
+    if (!narrow.matches) return () => {
+    };
+    const PHRASES = ["\u52A0\u8F7D\u63D0\u4F9B\u65B9\u76EE\u5F55\u5931\u8D25", "Settings are unavailable in this browser"];
+    const NOTICE = "\u624B\u673A\u4E0A\u4E0D\u652F\u6301\u6A21\u578B\u8BBE\u7F6E\uFF0C\u8BF7\u53BB\u7535\u8111\u7AEF\u4FEE\u6539\u8BBE\u7F6E";
+    const findDeepest = (el) => {
+      let deepest = el;
+      for (const child of el.querySelectorAll("*")) {
+        if (PHRASES.some((p) => (child.textContent ?? "").includes(p))) deepest = child;
+      }
+      return deepest;
+    };
+    const patch = () => {
+      for (const el of document.querySelectorAll("body *")) {
+        const t = el.textContent ?? "";
+        if (!PHRASES.some((p) => t.includes(p))) continue;
+        if (el.dataset?.dshpModelNotice === "1") continue;
+        const target = findDeepest(el);
+        target.textContent = NOTICE;
+        target.dataset.dshpModelNotice = "1";
+      }
+    };
+    const observer = new MutationObserver(patch);
+    observer.observe(document.body, { childList: true, subtree: true, characterData: true });
+    patch();
+    return () => observer.disconnect();
+  }, "dsh-mobile-nav: replace model-settings load error with mobile hint");
   ctx.slots.inject("conversation.session.header.actions", () => ctx.slots.register({
     name: "conversation.session.header.actions",
     id: "mobile-nav-toggle",
@@ -1760,7 +1948,7 @@ var zh2 = {
   "resetGo": "\u6062\u590D",
   "resetIntro": "\u8BBE\u7F6E\u641E\u51FA\u95EE\u9898\u65F6\u7684\u4E34\u65F6\u515C\u5E95\uFF1A\u6E05\u7A7A\u672C\u673A\u914D\u7F6E\u5E76\u91CD\u8BBE\u968F\u673A\u5BC6\u7801\uFF08DSH \u7684\u4F1A\u8BDD\u3001\u6A21\u578B\u3001\u63D2\u4EF6\u914D\u7F6E\u4E0D\u53D7\u5F71\u54CD\uFF09",
   "resetTitle": "\u26A0\uFE0F \u786E\u8BA4\u6062\u590D\u51FA\u5382\u8BBE\u7F6E\uFF1F",
-  "resetBody": "\u5C06\u6E05\u7A7A\u5E76\u6062\u590D\u9ED8\u8BA4\uFF1A\n\u2460 \u5F00\u5173\uFF1A\u5C40\u57DF\u7F51\u8BBF\u95EE=\u5F00\u3001\u8BBF\u95EE\u5BC6\u7801=\u5F00\u3001\u5C40\u57DF\u7F51\u5730\u5740=\u81EA\u52A8\n\u2461 \u516C\u7F51\uFF1A\u6A21\u5F0F\u56DE\u5230\u968F\u673A\u57DF\u540D\uFF0C\u6E05\u7A7A Tunnel Token \u4E0E\u56FA\u5B9A\u57DF\u540D\uFF0C\u5E76\u5173\u95ED\u6B63\u5728\u8FD0\u884C\u7684\u516C\u7F51\n\u2462 \u5BC6\u7801\uFF1A\u516C\u7F51\u548C\u5C40\u57DF\u7F51\u90FD\u6362\u6210\u65B0\u7684\u968F\u673A 8 \u4F4D\u5BC6\u7801\uFF08\u65E7\u5BC6\u7801\u7ACB\u5373\u4F5C\u5E9F\uFF0C\u624B\u673A\u9700\u91CD\u65B0\u8F93\u5165\uFF09\n\nDSH \u81EA\u8EAB\u7684\u4F1A\u8BDD\u3001\u6A21\u578B\u3001\u63D2\u4EF6\u914D\u7F6E\u4E0D\u53D7\u5F71\u54CD\uFF1B\u6B64\u64CD\u4F5C\u4E0D\u53EF\u64A4\u9500\u3002",
+  "resetBody": "\u5C06\u6E05\u7A7A\u5E76\u6062\u590D\u9ED8\u8BA4\uFF1A\n\u2460 \u5F00\u5173\uFF1A\u5C40\u57DF\u7F51\u8BBF\u95EE=\u5F00\u3001\u8BBF\u95EE\u5BC6\u7801=\u5F00\u3001\u624B\u673A\u7AEF\u53F3\u8FB9\u680F=\u5F00\u3001\u5C40\u57DF\u7F51\u5730\u5740=\u81EA\u52A8\n\u2461 \u516C\u7F51\uFF1A\u6A21\u5F0F\u56DE\u5230\u968F\u673A\u57DF\u540D\uFF0C\u6E05\u7A7A Tunnel Token \u4E0E\u56FA\u5B9A\u57DF\u540D\uFF0C\u5E76\u5173\u95ED\u6B63\u5728\u8FD0\u884C\u7684\u516C\u7F51\n\u2462 \u5BC6\u7801\uFF1A\u516C\u7F51\u548C\u5C40\u57DF\u7F51\u90FD\u6362\u6210\u65B0\u7684\u968F\u673A 8 \u4F4D\u5BC6\u7801\uFF08\u65E7\u5BC6\u7801\u7ACB\u5373\u4F5C\u5E9F\uFF0C\u624B\u673A\u9700\u91CD\u65B0\u8F93\u5165\uFF09\n\nDSH \u81EA\u8EAB\u7684\u4F1A\u8BDD\u3001\u6A21\u578B\u3001\u63D2\u4EF6\u914D\u7F6E\u4E0D\u53D7\u5F71\u54CD\uFF1B\u6B64\u64CD\u4F5C\u4E0D\u53EF\u64A4\u9500\u3002",
   "resetConfirm": "\u786E\u8BA4\u6062\u590D",
   "resetDone": "\u2705 \u5DF2\u6062\u590D\u51FA\u5382\u8BBE\u7F6E\uFF1A\u8BBE\u7F6E\u5DF2\u6E05\u7A7A\uFF0C\u5BC6\u7801\u5DF2\u6362\u65B0\uFF08\u624B\u673A\u9700\u91CD\u65B0\u8F93\u5165\uFF09",
   "resetFailed": "\u274C \u6062\u590D\u5931\u8D25\uFF0C\u8BF7\u91CD\u8BD5",
@@ -1782,13 +1970,15 @@ var zh2 = {
   "lanPinCustomValue": "\u{1F510} \u8BBF\u95EE\u5BC6\u7801\uFF1A{pin}\uFF08\u81EA\u5B9A\u4E49\uFF1B\u624B\u673A\u6253\u5F00\u9700\u8F93\u5165\uFF09",
   "refresh": "\u5237\u65B0",
   "customize": "\u81EA\u5B9A\u4E49",
-  "customizing": "\u65B0\u5BC6\u7801\uFF088 \u4F4D\uFF0C\u82F1\u6587\u5B57\u6BCD\u6216\u6570\u5B57\uFF09\uFF1A",
+  "customizing": "\u65B0\u5BC6\u7801\uFF088\u201364 \u4F4D\uFF0C\u82F1\u6587\u5B57\u6BCD\u6216\u6570\u5B57\uFF09\uFF1A",
   "save": "\u4FDD\u5B58",
   "cancel": "\u53D6\u6D88",
-  "pinInvalid": "\u5BC6\u7801\u5FC5\u987B\u662F 8 \u4F4D\u82F1\u6587\u5B57\u6BCD\u6216\u6570\u5B57",
+  "pinInvalid": "\u5BC6\u7801\u5FC5\u987B\u662F 8\u201364 \u4F4D\u82F1\u6587\u5B57\u6BCD\u6216\u6570\u5B57",
   "pinCustomHint": "\u81EA\u5B9A\u4E49\u540E\u5F00\u542F\u516C\u7F51\u4E0D\u518D\u81EA\u52A8\u6362\u65B0",
   "lanPinOff": "\u{1F513} \u5BC6\u7801\u5DF2\u5173\u95ED\uFF1A\u626B\u7801\u76F4\u8FDE\uFF0C\u65E0\u9700\u5BC6\u7801\uFF08\u4EC5\u540C\u4E00\u5C40\u57DF\u7F51\u8BBE\u5907\u53EF\u8BBF\u95EE\uFF1B\u516C\u7F51\u4ECD\u8981\u5BC6\u7801\uFF09",
   "lanStarting": "\u4EE3\u7406\u672A\u5C31\u7EEA\u2026",
+  "mobileRightbar": "\u624B\u673A\u7AEF\u53F3\u8FB9\u680F",
+  "mobileRightbarHint": "\u663E\u793A\u539F\u751F\u53F3\u8FB9\u680F\u5165\u53E3\uFF1B\u666E\u901A\u624B\u673A\u53EF\u6309\u9700\u5173\u95ED\uFF0C\u6298\u53E0\u5C4F\u5C55\u5F00\u540E\u4F7F\u7528\u66F4\u65B9\u4FBF",
   "wanTitle": "\u{1F310} \u516C\u7F51\uFF08\u4EBA\u5728\u5916\u9762\uFF09",
   "wanHint": "\u4EFB\u4F55\u7F51\u7EDC\u626B\u7801\u5373\u7528\uFF08URL \u6BCF\u6B21\u91CD\u542F\u81EA\u52A8\u6362\u65B0\uFF09",
   "wanPin": "\u{1F510} \u8BBF\u95EE\u5BC6\u7801\uFF1A{pin}\uFF08\u6BCF\u6B21\u5F00\u542F\u516C\u7F51\u53D8\u65B0\uFF1B\u624B\u673A\u6253\u5F00\u94FE\u63A5\u9700\u8F93\u5165\u6B64\u5BC6\u7801\uFF09",
@@ -1856,7 +2046,7 @@ var en2 = {
   "resetGo": "Reset",
   "resetIntro": "Temporary fallback when settings break: clear local config and re-roll random PINs (DSH sessions, models and plugin config are untouched)",
   "resetTitle": "\u26A0\uFE0F Confirm factory reset?",
-  "resetBody": "This clears and restores defaults:\n\u2460 Switches: LAN access on, access PIN on, LAN address auto\n\u2461 Public: mode back to random URL, Tunnel Token and fixed domain cleared, and any running tunnel is stopped\n\u2462 PINs: both public and LAN become new random 8-character PINs (old ones stop working; the phone must re-enter)\n\nYour DSH sessions, models and plugin config are untouched. This cannot be undone.",
+  "resetBody": "This clears and restores defaults:\n\u2460 Switches: LAN access on, access PIN on, mobile right sidebar on, LAN address auto\n\u2461 Public: mode back to random URL, Tunnel Token and fixed domain cleared, and any running tunnel is stopped\n\u2462 PINs: both public and LAN become new random 8-character PINs (old ones stop working; the phone must re-enter)\n\nYour DSH sessions, models and plugin config are untouched. This cannot be undone.",
   "resetConfirm": "Reset",
   "resetDone": "\u2705 Factory reset done: settings cleared and PINs re-rolled (re-enter the PIN on your phone)",
   "resetFailed": "\u274C Reset failed \u2014 please retry",
@@ -1878,13 +2068,15 @@ var en2 = {
   "lanPinCustomValue": "\u{1F510} PIN: {pin} (custom; required on the phone)",
   "refresh": "Refresh",
   "customize": "Customize",
-  "customizing": "New PIN (8 chars, letters/digits): ",
+  "customizing": "New PIN (8\u201364 chars, letters/digits): ",
   "save": "Save",
   "cancel": "Cancel",
-  "pinInvalid": "PIN must be exactly 8 characters (letters and digits only)",
+  "pinInvalid": "PIN must be 8\u201364 characters (letters and digits only)",
   "pinCustomHint": "custom PINs are not rotated on tunnel start",
   "lanPinOff": "\u{1F513} PIN off \u2014 scan & go, no PIN (LAN devices only; public still requires PIN)",
   "lanStarting": "Proxy starting\u2026",
+  "mobileRightbar": "Mobile right sidebar",
+  "mobileRightbarHint": "Show the native right-sidebar entry; disable it for a compact phone header or keep it on for an unfolded display",
   "wanTitle": "\u{1F310} Anywhere (public)",
   "wanHint": "Scan from any network (the URL changes on every restart)",
   "wanPin": "\u{1F510} PIN: {pin} (changes each time the tunnel is enabled; required on the phone)",
@@ -1943,6 +2135,11 @@ var styles = {
   qr: { width: 220, height: 220, borderRadius: 10, border: "1px solid var(--dsw-alias-border-l2,#e5e7eb)", margin: "8px 0" },
   warn: { color: "var(--dsw-alias-state-warn-primary,#b45309)", fontSize: 12, lineHeight: 1.5 }
 };
+function applyMobileRightbarSetting(enabled) {
+  const on = enabled !== false;
+  document.body?.setAttribute(MOBILE_RIGHTBAR_ATTRIBUTE, on ? "on" : "off");
+  window.dispatchEvent(new CustomEvent(MOBILE_RIGHTBAR_EVENT, { detail: { enabled: on } }));
+}
 function PocketSettingsTab({ rpcCall, t }) {
   const [status, setStatus] = (0, import_react2.useState)(null);
   const [busy, setBusy] = (0, import_react2.useState)(false);
@@ -1966,6 +2163,7 @@ function PocketSettingsTab({ rpcCall, t }) {
     try {
       const s = await call(POCKET_ENDPOINTS.status, {});
       setStatus(s);
+      applyMobileRightbarSetting(s.mobileRightbarEnabled);
       setTunnelState(s.tunnelState ?? null);
       if (s.desktop) setIsDesktop(true);
       if (s.restartNotice) {
@@ -2112,7 +2310,9 @@ function PocketSettingsTab({ rpcCall, t }) {
     setBusy(true);
     setError(null);
     try {
-      setStatus(await call(POCKET_ENDPOINTS.pocketReset, { confirm: true }));
+      const next = await call(POCKET_ENDPOINTS.pocketReset, { confirm: true });
+      setStatus(next);
+      applyMobileRightbarSetting(next.mobileRightbarEnabled);
       setTunnelCfg(null);
       setCustomPin(null);
       setAdvOpen(false);
@@ -2136,6 +2336,16 @@ function PocketSettingsTab({ rpcCall, t }) {
       const r = await call(POCKET_ENDPOINTS.lanAuthSetEnabled, { on });
       setStatus((s) => ({ ...s, lanAuthEnabled: r.lanAuthEnabled }));
     } catch {
+    }
+  };
+  const setMobileRightbar = async (on) => {
+    try {
+      const r = await call(POCKET_ENDPOINTS.mobileRightbarSetEnabled, { on });
+      const enabled = r.mobileRightbarEnabled === true;
+      setStatus((s) => ({ ...s, mobileRightbarEnabled: enabled }));
+      applyMobileRightbarSetting(enabled);
+    } catch (err) {
+      setError(err.message);
     }
   };
   const [lanToggleOpen, setLanToggleOpen] = (0, import_react2.useState)(null);
@@ -2181,7 +2391,8 @@ function PocketSettingsTab({ rpcCall, t }) {
     (0, import_react2.createElement)("input", {
       style: { width: 130, margin: "0 6px", padding: "4px 8px", fontSize: 14, letterSpacing: 1, textAlign: "center", border: "1px solid var(--dsw-alias-border-l2,#d1d5db)", borderRadius: 6, outline: "none" },
       type: "password",
-      maxLength: 8,
+      minLength: 8,
+      maxLength: 64,
       value: customPin?.value ?? "",
       autoFocus: true,
       onChange: (e) => setCustomPin((c) => ({ ...c, value: e.target.value.replace(/[^a-zA-Z0-9]/g, ""), err: null })),
@@ -2480,6 +2691,15 @@ function PocketSettingsTab({ rpcCall, t }) {
           )
         ) : null
       ) : null
+    ),
+    (0, import_react2.createElement)(
+      "div",
+      { style: styles.block },
+      row(
+        t("mobileRightbar"),
+        Switch(status?.mobileRightbarEnabled !== false, () => setMobileRightbar(status?.mobileRightbarEnabled === false)),
+        (0, import_react2.createElement)("div", { style: { ...styles.muted, marginTop: 6 } }, t("mobileRightbarHint"))
+      )
     ),
     error ? (0, import_react2.createElement)("div", { style: { color: "var(--dsw-alias-state-error-primary,#dc2626)", fontSize: 12, marginTop: 8 } }, `\u274C ${errText(error)}`) : null,
     // 恢复出厂设置：设置出问题时的临时兜底（最底部，避免误触）
